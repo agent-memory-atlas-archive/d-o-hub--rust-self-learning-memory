@@ -300,6 +300,7 @@ mod tests {
                 "DELETE FROM embeddings WHERE item_id IN (?,?)".to_string(),
                 "DELETE FROM embeddings_384 WHERE item_id IN (?,?)".to_string(),
                 "DELETE FROM episodes WHERE episode_id IN (?,?)".to_string(),
+                "DELETE FROM episode_revisions WHERE episode_id IN (?,?)".to_string(),
                 "COMMIT".to_string(),
             ],
             "both table families purged before the episode delete, then committed"

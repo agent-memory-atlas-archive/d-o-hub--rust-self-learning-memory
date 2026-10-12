@@ -12,7 +12,7 @@ use do_memory_core::memory::attribution::{
 use do_memory_core::storage::circuit_breaker::{
     CircuitBreaker, CircuitBreakerConfig, CircuitState,
 };
-use do_memory_core::{Episode, Heuristic, Pattern, Result, StorageBackend, SyncWatermarkBackend};
+use do_memory_core::{Episode, Heuristic, Pattern, Result, StorageBackend};
 use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -134,7 +134,7 @@ impl ResilientStorage {
     }
 
     /// Helper to reduce circuit-breaker boilerplate in StorageBackend methods
-    async fn circuit_call<F, Fut, T>(&self, op: F) -> Result<T>
+    pub(crate) async fn circuit_call<F, Fut, T>(&self, op: F) -> Result<T>
     where
         F: FnOnce(Arc<TursoStorage>) -> Fut + Send + 'static,
         Fut: std::future::Future<Output = Result<T>> + Send,
@@ -299,31 +299,6 @@ impl StorageBackend for ResilientStorage {
 
     async fn list_recommendation_feedback(&self) -> Result<Vec<RecommendationFeedback>> {
         self.circuit_call(move |s| async move { s.list_recommendation_feedback().await })
-            .await
-    }
-}
-
-#[async_trait]
-impl SyncWatermarkBackend for ResilientStorage {
-    async fn query_episodes_modified_since(
-        &self,
-        since: chrono::DateTime<chrono::Utc>,
-        cursor: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
-        limit: Option<usize>,
-    ) -> Result<Vec<(Episode, chrono::DateTime<chrono::Utc>)>> {
-        self.circuit_call(move |s| async move {
-            s.query_episodes_modified_since(since, cursor, limit).await
-        })
-        .await
-    }
-
-    async fn load_sync_watermark(&self) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
-        self.circuit_call(|s| async move { s.load_sync_watermark().await })
-            .await
-    }
-
-    async fn save_sync_watermark(&self, watermark: chrono::DateTime<chrono::Utc>) -> Result<()> {
-        self.circuit_call(move |s| async move { s.save_sync_watermark(watermark).await })
             .await
     }
 }
