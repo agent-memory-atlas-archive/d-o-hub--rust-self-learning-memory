@@ -20,9 +20,8 @@ impl TursoStorage {
     /// Store an episode
     pub async fn store_episode(&self, episode: &Episode) -> Result<()> {
         debug!("Storing episode: {}", episode.episode_id);
-        let (conn, _conn_id) = self.get_connection_with_id().await?;
-
-        const SQL: &str = r#"
+        self.with_connection_with_id(async |conn, conn_id| {
+            const SQL: &str = r#"
             INSERT OR REPLACE INTO episodes (
                 episode_id, task_type, task_description, context,
                 start_time, end_time, steps, outcome, reward,
@@ -31,233 +30,242 @@ impl TursoStorage {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#;
 
-        let context_json = serde_json::to_string(&episode.context).map_err(Error::Serialization)?;
-        let steps_json = serde_json::to_string(&episode.steps).map_err(Error::Serialization)?;
-        let outcome_json = serde_json::to_string(&episode.outcome).map_err(Error::Serialization)?;
-        let reward_json = serde_json::to_string(&episode.reward).map_err(Error::Serialization)?;
-        let reflection_json =
-            serde_json::to_string(&episode.reflection).map_err(Error::Serialization)?;
-        let patterns_json =
-            serde_json::to_string(&episode.patterns).map_err(Error::Serialization)?;
-        let heuristics_json =
-            serde_json::to_string(&episode.heuristics).map_err(Error::Serialization)?;
-        let checkpoints_json =
-            serde_json::to_string(&episode.checkpoints).map_err(Error::Serialization)?;
-        let metadata_json =
-            serde_json::to_string(&episode.metadata).map_err(Error::Serialization)?;
+            let context_json =
+                serde_json::to_string(&episode.context).map_err(Error::Serialization)?;
+            let steps_json = serde_json::to_string(&episode.steps).map_err(Error::Serialization)?;
+            let outcome_json =
+                serde_json::to_string(&episode.outcome).map_err(Error::Serialization)?;
+            let reward_json =
+                serde_json::to_string(&episode.reward).map_err(Error::Serialization)?;
+            let reflection_json =
+                serde_json::to_string(&episode.reflection).map_err(Error::Serialization)?;
+            let patterns_json =
+                serde_json::to_string(&episode.patterns).map_err(Error::Serialization)?;
+            let heuristics_json =
+                serde_json::to_string(&episode.heuristics).map_err(Error::Serialization)?;
+            let checkpoints_json =
+                serde_json::to_string(&episode.checkpoints).map_err(Error::Serialization)?;
+            let metadata_json =
+                serde_json::to_string(&episode.metadata).map_err(Error::Serialization)?;
 
-        let stmt = self
-            .prepared_cache
-            .get_or_prepare(&conn, SQL)
+            let stmt = self
+                .prepared_cache
+                .get_or_prepare_with_id(conn_id, conn, SQL)
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
+
+            // The episode row and its revision must commit together: the sync query
+            // INNER JOINs `episode_revisions`, so a revision-less episode would be
+            // invisible to incremental sync forever.
+            conn.execute("BEGIN TRANSACTION", ()).await.map_err(|e| {
+                Error::Storage(format!("Failed to begin episode transaction: {}", e))
+            })?;
+
+            if let Err(e) = stmt
+                .execute(libsql::params![
+                    episode.episode_id.to_string(),
+                    episode.task_type.to_string(),
+                    episode.task_description.clone(),
+                    context_json,
+                    episode.start_time.timestamp(),
+                    episode.end_time.map(|t| t.timestamp()),
+                    steps_json,
+                    outcome_json,
+                    reward_json,
+                    reflection_json,
+                    patterns_json,
+                    heuristics_json,
+                    checkpoints_json,
+                    metadata_json,
+                    episode.context.domain.clone(),
+                    episode.context.language.clone(),
+                ])
+                .await
+            {
+                rollback(conn).await;
+                return Err(Error::Storage(format!("Failed to store episode: {}", e)));
+            }
+
+            // Refresh the modification watermark; this is what incremental sync
+            // observes, independently of the episode's (possibly old) start_time.
+            if let Err(e) = crate::storage::episodes::revision::record_episode_revision(
+                conn,
+                &episode.episode_id.to_string(),
+                chrono::Utc::now().timestamp_millis(),
+            )
             .await
-            .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
+            {
+                rollback(conn).await;
+                return Err(e);
+            }
 
-        // The episode row and its revision must commit together: the sync query
-        // INNER JOINs `episode_revisions`, so a revision-less episode would be
-        // invisible to incremental sync forever.
-        conn.execute("BEGIN TRANSACTION", ())
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to begin episode transaction: {}", e)))?;
+            conn.execute("COMMIT", ()).await.map_err(|e| {
+                Error::Storage(format!("Failed to commit episode transaction: {}", e))
+            })?;
 
-        if let Err(e) = stmt
-            .execute(libsql::params![
-                episode.episode_id.to_string(),
-                episode.task_type.to_string(),
-                episode.task_description.clone(),
-                context_json,
-                episode.start_time.timestamp(),
-                episode.end_time.map(|t| t.timestamp()),
-                steps_json,
-                outcome_json,
-                reward_json,
-                reflection_json,
-                patterns_json,
-                heuristics_json,
-                checkpoints_json,
-                metadata_json,
-                episode.context.domain.clone(),
-                episode.context.language.clone(),
-            ])
-            .await
-        {
-            rollback(&conn).await;
-            return Err(Error::Storage(format!("Failed to store episode: {}", e)));
-        }
+            // Store tags if any
+            if !episode.tags.is_empty() {
+                save_episode_tags(conn, &episode.episode_id, &episode.tags).await?;
+            }
 
-        // Refresh the modification watermark; this is what incremental sync
-        // observes, independently of the episode's (possibly old) start_time.
-        if let Err(e) = crate::storage::episodes::revision::record_episode_revision(
-            &conn,
-            &episode.episode_id.to_string(),
-            chrono::Utc::now().timestamp_millis(),
-        )
+            info!("Successfully stored episode: {}", episode.episode_id);
+            Ok(())
+        })
         .await
-        {
-            rollback(&conn).await;
-            return Err(e);
-        }
-
-        conn.execute("COMMIT", ())
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to commit episode transaction: {}", e)))?;
-
-        // Store tags if any
-        if !episode.tags.is_empty() {
-            save_episode_tags(&conn, &episode.episode_id, &episode.tags).await?;
-        }
-
-        info!("Successfully stored episode: {}", episode.episode_id);
-        Ok(())
     }
 
     /// Retrieve an episode by ID
     pub async fn get_episode(&self, id: Uuid) -> Result<Option<Episode>> {
         debug!("Retrieving episode: {}", id);
-        let (conn, _conn_id) = self.get_connection_with_id().await?;
+        self.with_connection_with_id(async |conn, conn_id| {
+            let select_cols = super::raw_query::EPISODE_SELECT_COLUMNS;
+            let sql = format!("SELECT {} FROM episodes WHERE episode_id = ?", select_cols);
 
-        let select_cols = super::raw_query::EPISODE_SELECT_COLUMNS;
-        let sql = format!("SELECT {} FROM episodes WHERE episode_id = ?", select_cols);
+            let stmt = self
+                .prepared_cache
+                .get_or_prepare_with_id(conn_id, conn, &sql)
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
 
-        let stmt = self
-            .prepared_cache
-            .get_or_prepare(&conn, &sql)
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
+            let mut rows = stmt
+                .query(libsql::params![id.to_string()])
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to query episode: {}", e)))?;
 
-        let mut rows = stmt
-            .query(libsql::params![id.to_string()])
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to query episode: {}", e)))?;
+            if let Some(row) = rows
+                .next()
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to fetch episode row: {}", e)))?
+            {
+                let mut episode = super::row::row_to_episode(&row)?;
 
-        if let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to fetch episode row: {}", e)))?
-        {
-            let mut episode = super::row::row_to_episode(&row)?;
+                // Load tags
+                episode.tags = get_episode_tags(conn, &id).await?;
 
-            // Load tags
-            episode.tags = get_episode_tags(&conn, &id).await?;
-
-            Ok(Some(episode))
-        } else {
-            Ok(None)
-        }
+                Ok(Some(episode))
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 
     /// Delete an episode by ID
     pub async fn delete_episode(&self, id: Uuid) -> Result<()> {
         debug!("Deleting episode: {}", id);
-        let (conn, _conn_id) = self.get_connection_with_id().await?;
+        self.with_connection_with_id(async |conn, conn_id| {
+            const SQL: &str = "DELETE FROM episodes WHERE episode_id = ?";
 
-        const SQL: &str = "DELETE FROM episodes WHERE episode_id = ?";
-
-        let stmt = self
-            .prepared_cache
-            .get_or_prepare(&conn, SQL)
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
-
-        conn.execute("BEGIN TRANSACTION", ())
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to begin delete transaction: {}", e)))?;
-
-        if let Err(e) = stmt.execute(libsql::params![id.to_string()]).await {
-            rollback(&conn).await;
-            return Err(Error::Storage(format!("Failed to delete episode: {}", e)));
-        }
-
-        if let Err(e) =
-            crate::storage::episodes::revision::forget_episode_revision(&conn, &id.to_string())
+            let stmt = self
+                .prepared_cache
+                .get_or_prepare_with_id(conn_id, conn, SQL)
                 .await
-        {
-            rollback(&conn).await;
-            return Err(e);
-        }
+                .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
 
-        conn.execute("COMMIT", ())
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to commit delete transaction: {}", e)))?;
+            conn.execute("BEGIN TRANSACTION", ()).await.map_err(|e| {
+                Error::Storage(format!("Failed to begin delete transaction: {}", e))
+            })?;
 
-        info!("Successfully deleted episode: {}", id);
-        Ok(())
+            if let Err(e) = stmt.execute(libsql::params![id.to_string()]).await {
+                rollback(conn).await;
+                return Err(Error::Storage(format!("Failed to delete episode: {}", e)));
+            }
+
+            if let Err(e) =
+                crate::storage::episodes::revision::forget_episode_revision(conn, &id.to_string())
+                    .await
+            {
+                rollback(conn).await;
+                return Err(e);
+            }
+
+            conn.execute("COMMIT", ()).await.map_err(|e| {
+                Error::Storage(format!("Failed to commit delete transaction: {}", e))
+            })?;
+
+            info!("Successfully deleted episode: {}", id);
+            Ok(())
+        })
+        .await
     }
 
     /// Store a semantic summary for an episode
     pub async fn store_summary(&self, episode_id: Uuid, summary: &EpisodeSummary) -> Result<()> {
         debug!("Storing summary for episode: {}", episode_id);
-        let (conn, _conn_id) = self.get_connection_with_id().await?;
-
-        const SQL: &str = r#"
+        self.with_connection_with_id(async |conn, conn_id| {
+            const SQL: &str = r#"
             INSERT OR REPLACE INTO episode_summaries (
                 episode_id, summary_text, key_concepts, key_steps, summary_embedding
             ) VALUES (?, ?, ?, ?, ?)
         "#;
 
-        let key_concepts_json =
-            serde_json::to_string(&summary.key_concepts).map_err(Error::Serialization)?;
-        let key_steps_json =
-            serde_json::to_string(&summary.key_steps).map_err(Error::Serialization)?;
+            let key_concepts_json =
+                serde_json::to_string(&summary.key_concepts).map_err(Error::Serialization)?;
+            let key_steps_json =
+                serde_json::to_string(&summary.key_steps).map_err(Error::Serialization)?;
 
-        // Convert f32 vector to bytes for BLOB storage
-        let embedding_bytes = summary.summary_embedding.as_ref().map(|vec| {
-            let mut bytes = Vec::with_capacity(vec.len() * 4);
-            for &f in vec {
-                bytes.extend_from_slice(&f.to_le_bytes());
-            }
-            bytes
-        });
+            // Convert f32 vector to bytes for BLOB storage
+            let embedding_bytes = summary.summary_embedding.as_ref().map(|vec| {
+                let mut bytes = Vec::with_capacity(vec.len() * 4);
+                for &f in vec {
+                    bytes.extend_from_slice(&f.to_le_bytes());
+                }
+                bytes
+            });
 
-        let stmt = self
-            .prepared_cache
-            .get_or_prepare(&conn, SQL)
+            let stmt = self
+                .prepared_cache
+                .get_or_prepare_with_id(conn_id, conn, SQL)
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
+
+            stmt.execute(libsql::params![
+                episode_id.to_string(),
+                summary.summary_text.clone(),
+                key_concepts_json,
+                key_steps_json,
+                embedding_bytes,
+            ])
             .await
-            .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
+            .map_err(|e| Error::Storage(format!("Failed to store summary: {}", e)))?;
 
-        stmt.execute(libsql::params![
-            episode_id.to_string(),
-            summary.summary_text.clone(),
-            key_concepts_json,
-            key_steps_json,
-            embedding_bytes,
-        ])
+            info!("Successfully stored summary for episode: {}", episode_id);
+            Ok(())
+        })
         .await
-        .map_err(|e| Error::Storage(format!("Failed to store summary: {}", e)))?;
-
-        info!("Successfully stored summary for episode: {}", episode_id);
-        Ok(())
     }
 
     /// Retrieve a semantic summary by episode ID
     pub async fn get_summary(&self, episode_id: Uuid) -> Result<Option<EpisodeSummary>> {
         debug!("Retrieving summary for episode: {}", episode_id);
-        let (conn, _conn_id) = self.get_connection_with_id().await?;
-
-        const SQL: &str = r#"
+        self.with_connection_with_id(async |conn, conn_id| {
+            const SQL: &str = r#"
             SELECT episode_id, summary_text, key_concepts, key_steps, summary_embedding
             FROM episode_summaries WHERE episode_id = ?
         "#;
 
-        let stmt = self
-            .prepared_cache
-            .get_or_prepare(&conn, SQL)
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
+            let stmt = self
+                .prepared_cache
+                .get_or_prepare_with_id(conn_id, conn, SQL)
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to prepare statement: {}", e)))?;
 
-        let mut rows = stmt
-            .query(libsql::params![episode_id.to_string()])
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to query summary: {}", e)))?;
+            let mut rows = stmt
+                .query(libsql::params![episode_id.to_string()])
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to query summary: {}", e)))?;
 
-        if let Some(row) = rows
-            .next()
-            .await
-            .map_err(|e| Error::Storage(format!("Failed to fetch summary row: {}", e)))?
-        {
-            Ok(Some(super::row::row_to_summary(&row)?))
-        } else {
-            Ok(None)
-        }
+            if let Some(row) = rows
+                .next()
+                .await
+                .map_err(|e| Error::Storage(format!("Failed to fetch summary row: {}", e)))?
+            {
+                Ok(Some(super::row::row_to_summary(&row)?))
+            } else {
+                Ok(None)
+            }
+        })
+        .await
     }
 }
 
