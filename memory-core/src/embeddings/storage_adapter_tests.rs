@@ -9,8 +9,8 @@ use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
 
 use crate::episode::{Episode, PatternId};
-use crate::storage::StorageBackendCapabilities;
 use crate::patterns::Pattern;
+use crate::storage::StorageBackendCapabilities;
 use crate::types::{TaskContext, TaskType};
 use crate::{Heuristic, Result, StorageBackend};
 
