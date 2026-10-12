@@ -48,6 +48,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backfilled once at startup. The watermark is persisted durably and advances
   only after a whole page succeeds, so a restart resumes instead of re-basing
   the window and a failed page stays retryable from the last durable progress.
+- MCP `configure_embeddings` no longer routes every activation through a
+  process-local `InMemoryEmbeddingStorage` (#1073). Configured primary/cache
+  `StorageBackend` handles are composed into an identity-scoped
+  `EmbeddingStorageAdapter` (provider identity + configuration revision in the
+  logical key), so vectors persist and a reconfiguration cannot read vectors
+  written under a different provider identity/revision. With no backend the
+  store is explicitly ephemeral and `configure_embeddings` /
+  `embedding_provider_status` report `storage_mode: "ephemeral"` plus a
+  restart-loss warning instead of implying persistence. `StorageBackend` gains a
+  defaulted `list_embedding_ids` so the adapter can brute-force similarity
+  search without a concrete backend type; `find_similar_episodes` and
+  `find_similar_patterns` keep working through the key-shape change.
 - Turso storage retains pool permits for the whole database operation (#1064):
   `TursoStorage` gains scoped `with_connection`/`with_connection_with_id`
   helpers that own the pool guard across the query, its row iteration, and any
