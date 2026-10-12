@@ -11,7 +11,6 @@
     clippy::excessive_nesting,
     reason = "Complex control flow in cache logic"
 )]
-#![expect(unused_mut, reason = "Variables used conditionally")]
 // Cast-related: necessary for SQL storage metrics and statistics
 #![expect(
     clippy::cast_precision_loss,
@@ -64,7 +63,6 @@
     reason = "owned params kept for ergonomics"
 )]
 #![expect(clippy::unused_self, reason = "method kept for API symmetry")]
-#![expect(clippy::unused_async, reason = "async kept for API symmetry")]
 #![cfg_attr(
     test,
     expect(
