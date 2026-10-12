@@ -23,7 +23,6 @@
 )]
 #![expect(clippy::expect_used, reason = "infallible expect in known-good paths")]
 #![expect(clippy::uninlined_format_args, reason = "format args kept explicit")]
-#![expect(missing_docs, reason = "public docs still incomplete")]
 
 //! # Test Utilities
 //!
