@@ -1,7 +1,7 @@
 # GOAP — Release Closeout 2026-10-16 (v0.1.45 shipped, publish stalled, nightly red)
 
 - **Last Updated**: 2026-10-16
-- **Workspace**: `0.1.45` · **Latest tag**: `v0.1.45` (GitHub Release published 2026-10-16T10:30:09Z, tag SHA `8ee711bd`)
+- **Workspace**: `0.1.46` (bumped by this PR) · **Latest tag**: `v0.1.45` (GitHub Release published 2026-10-16T10:30:09Z, tag SHA `8ee711bd`)
 - **Scope of this doc**: the three things the v0.1.45 ship left behind — a **false-green crates.io publish**,
   a **5-day-red nightly**, and a **merge queue that the release-drift gate blocks**. It is the handoff record for
   whoever continues the chain; every claim below has a command next to it.
@@ -30,20 +30,21 @@ invalidates every other PR's required runs. On top of that, `check-release-drift
 `v<tag>..HEAD` has any commit — which is exactly the post-release state. The `Enforce release cadence` step is
 skipped only for a PR carrying `release-preparation`, which is reserved for the release PR itself.
 
-**Therefore the version bump goes first.** It is the only change that makes the gate honest: no label override on
-an unrelated PR, no waiver, nothing skipped. After it merges, every PR below evaluates
-`workspace_version=0.1.46 > latest_tag=v0.1.45` → `is_valid_next_version` → clean.
+**Therefore the version bump goes first, and it rides in this plans PR.** Splitting it into a separate PR would
+have made two PRs edit the same six tracker files (the documented same-file trap), and this PR touches nothing
+outside `plans/` + `Cargo.{toml,lock}`, so it overlaps no code PR. Bumping here is the only change that makes the
+gate honest: no label override on an unrelated PR, no waiver, nothing skipped. Once it merges, every PR still in
+the queue evaluates `workspace_version=0.1.46 > latest_tag=v0.1.45` → `is_valid_next_version` → clean.
 
 ```
-0.1.46 bump PR  ────► clears critical drift for the whole queue (b3d1b944 is the template:
-        │               Cargo.toml + Cargo.lock + version references across plans/; it does
-        │               NOT move the CHANGELOG [Unreleased] heading — that happens at release)
+this PR: plans closeout + 0.1.46 bump  ──► clears critical drift for the whole queue
+        │   (Cargo.toml + Cargo.lock + version references across the active plan set, template
+        │    b3d1b944; it does NOT move the CHANGELOG [Unreleased] heading — that happens at release)
         ▼
 #1179 publish guard   (must be in main before the tag: the chain runs from the tag SHA)
 #1177 readiness gate  (latest-run-per-name)
 #1175 guardrail docs  (owns AGENTS.md + agent_docs/LESSONS.md)
 #1180 nightly Turso   (owns memory-storage-turso/*)
-plans closeout (this) (plans/ only)
         │
         ▼
 tag v0.1.46 ──► release.yml ──► publish-crates.yml (first real publish)
@@ -89,10 +90,10 @@ cargo nextest run -p do-memory-storage-turso --features turso_multi_dimension \
 
 | ID | Action | Depends on | Acceptance |
 |----|--------|-----------|------------|
-| ACT-399 | Merge #1179 (publish guard `inputs.dry-run != 'true'`, `Verify publish landed`, membership-shaped version check, gate-contract + publish-fixture sensors) | after ACT-402 | merged to `main`; `./scripts/validate-gate-contract.sh --ci-parity` PASS |
+| ACT-399 | Merge #1179 (publish guard `inputs.dry-run != 'true'`, `Verify publish landed`, membership-shaped version check, gate-contract + publish-fixture sensors) | after ACT-402 (this PR) | merged to `main`; `./scripts/validate-gate-contract.sh --ci-parity` PASS |
 | ACT-400 | Merge #1177 (readiness gate counts the **latest** run per check name) | after ACT-399 | merged; the stale `Check for unreleased changes` failures on #1179 no longer shadow its green re-run |
-| ACT-401 | Merge #1175 (guardrail docs) then #1180 (nightly Turso) then this plans PR, serially | after ACT-400 | each merged via `./scripts/merge-pr.sh <n> --execute` only |
-| ACT-402 | **0.1.46 bump PR — first in the queue**: workspace version, `Cargo.lock`, version references across the active plan set (template `b3d1b944`); it is what makes the drift gate clean instead of overriding it | nothing (main @ `8ee711bd`) | `./scripts/check-release-drift.sh` on the PR → `severity=clean`; `validate-plans.sh` + `check-docs-integrity.sh` green |
+| ACT-401 | Merge #1175 (guardrail docs) then #1180 (nightly Turso), serially | after ACT-400 | each merged via `./scripts/merge-pr.sh <n> --execute` only |
+| ACT-402 | **`0.1.46` version bump — landed in this PR**: `Cargo.toml` + `Cargo.lock` + version references across the active plan set (template `b3d1b944`). It is what makes the drift gate clean instead of overriding it | nothing (this PR) | `./scripts/check-release-drift.sh` → `severity=clean reason=within_cadence`; `validate-plans.sh` + `check-docs-integrity.sh` green |
 | ACT-409 | **Cut tag `v0.1.46`** once ACT-399…ACT-401 land, then verify the publish (this is the "publish the stalled versions" step) | ACT-399, ACT-401 | `do-memory-core`, `-storage-redb`, `-storage-turso`, `-mcp` all answer `index("0.1.46") != null` on crates.io **and** `Verify publish landed` green in every job |
 | ACT-403 | Next nightly run green (scheduled + `workflow_dispatch`) | after #1180 merges | `gh run list --workflow nightly-tests.yml --limit 1` → `success`; the two feature-gated suites reported in the dedicated step, 20/20 |
 | ACT-404 | `libsql 0.9.30 → 0.10.0` upgrade PR (both lockfiles) to clear 8 of the 12 Dependabot alerts | none | alerts 0; `cargo audit` clean; record `lru` as **upstream-blocked** by `augurs-changepoint`'s `rv 0.16` pin rather than pretending it is fixable |

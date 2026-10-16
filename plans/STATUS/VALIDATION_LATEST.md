@@ -3,7 +3,7 @@
 **Goal**: record the verified state of the release closeout — what shipped, what is in review, and the CI/local
 evidence attached to each head SHA (PR monitoring guardrail from the `goap-agent` skill).
 
-**Workspace**: `0.1.45` · **Branch**: `main` @ `8ee711bd` · **Tag**: `v0.1.45` (GitHub Release 2026-10-16T10:30:09Z)
+**Workspace**: `0.1.46` (bumped post-release in the closeout PR) · **Branch**: `main` @ `8ee711bd` · **Tag**: `v0.1.45` (GitHub Release 2026-10-16T10:30:09Z)
 **Plan**: [`../GOAP_RELEASE_CLOSEOUT_2026-10-16.md`](../GOAP_RELEASE_CLOSEOUT_2026-10-16.md)
 **Previous record**: [`archive/2026/VALIDATION_2026-10-09.md`](archive/2026/VALIDATION_2026-10-09.md) (audit-backlog wave A)
 
@@ -37,7 +37,7 @@ evidence attached to each head SHA (PR monitoring guardrail from the `goap-agent
 | #1177 readiness run ordering | `479eb16d` | 27 success / 1 in progress | latest-per-name reduction of the check-runs API reproduces the fix: #1179's two stale `Check for unreleased changes` **failures** are superseded by run `116964525934` = `success` |
 | #1175 guardrail docs | `7d8dac23` | 20 success / 6 pending | owns `AGENTS.md` + `agent_docs/LESSONS.md`; no code touched |
 | #1180 nightly Turso | `34774f4d` | 3 success / 14 pending | `--run-ignored only` → **86 passed / 0 failed** (default schema); `--features turso_multi_dimension --test multi_dimension_routing --test phase1_validation --run-ignored all` → **20 passed / 0 skipped**; `86 + 20 = 106` = pre-fix total; `cargo clippy -p do-memory-storage-turso --lib` clean in both feature configs; `yamllint`/`actionlint -shellcheck=` rc 0 |
-| plans closeout (this PR) | — | — | `./scripts/validate-plans.sh` green (active-set, version-state, tracker-drift) |
+| plans closeout + `0.1.46` bump (this PR) | — | — | `./scripts/check-release-drift.sh` → `severity=clean reason=within_cadence`; `./scripts/validate-plans.sh` green (active-set, version-state, tracker-drift); `./scripts/check-docs-integrity.sh` green; `cargo update --workspace --offline` for the lockfile |
 
 ## Findings (2026-10-13…16)
 
@@ -56,5 +56,5 @@ evidence attached to each head SHA (PR monitoring guardrail from the `goap-agent
 
 ## Live tracker state
 
-`gh pr list --state open` = 9 · `gh issue list --state open` = 5 (#1068, #1076, #1089, #1109, #1165) ·
+`gh pr list --state open` = 10 · `gh issue list --state open` = 5 (#1068, #1076, #1089, #1109, #1165) ·
 Dependabot alerts = 12 (2 high, 2 moderate, 8 low — high/moderate fixed on `main`, the 8 low need `libsql 0.10.0`).

@@ -2,7 +2,7 @@
 
 **Last Updated**: 2026-10-16
 **Released Version**: v0.1.45 (tag `8ee711bd`, GitHub Release 2026-10-16) — **not on crates.io** (newest published `0.1.34`)
-**Workspace Version**: 0.1.45 (post-v0.1.44 bump; `0.1.46` bump PR is the next intentional PR and the publish vehicle)
+**Workspace Version**: 0.1.46 (post-v0.1.45 bump, landed with the closeout; tag `v0.1.46` is the publish vehicle)
 **Edition**: Rust 2024
 **Active plan**: **release closeout** (`GOAP_RELEASE_CLOSEOUT_2026-10-16.md`) — the audit-backlog wave is merged and
 closed (`GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md`); what remains is the false-green crates.io publish (#1179), the
@@ -110,8 +110,8 @@ restated at each refresh. Read any campaign claim as campaign-scoped; the repo-w
 
 | Priority | Item | ID | Status |
 |----------|------|-----|--------|
-| P0 | Land the `0.1.46` bump PR **first** — it clears critical drift for the whole queue, so no PR needs the `release-preparation` override | ACT-402 | ⏳ next |
-| P0 | Then merge the rest serially with full green CI (Codacy included, no waivers): #1179 → #1177 → #1175 → #1180 → plans | ACT-399…401 | 🔄 |
+| P0 | Land the closeout PR **first** — it carries the `0.1.46` bump, which clears critical drift for the whole queue so no PR needs the `release-preparation` override | ACT-402 | 🔄 next |
+| P0 | Then merge the rest serially with full green CI (Codacy included, no waivers): #1179 → #1177 → #1175 → #1180 | ACT-399…401 | 🔄 |
 | P0 | Cut tag `v0.1.46` after those land and verify every crate resolves on crates.io | ACT-409 | ⏳ |
 | P0 | `0.1.46` bump PR → tag `v0.1.46` → verify every crate resolves on crates.io **and** `Verify publish landed` green | ACT-402 | ⏳ |
 | P0 | Next nightly run green (scheduled + dispatch), including the new feature-specific step | ACT-403 | ⏳ |

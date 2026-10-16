@@ -2,7 +2,7 @@
 
 **Generated**: 2026-10-04
 **Audit baseline of the findings**: `9f50c607` (2026-09-28) · **Re-validated at**: `74a44a15` (`main`)
-**Workspace Version**: `0.1.45` · **Released Tag**: `v0.1.44`
+**Workspace Version**: `0.1.46` · **Released Tag**: `v0.1.45`
 **Active Focus**: GAP03 — repo-wide issue register (previous focus DOC02, archived at `archive/2026/GAP_ANALYSIS_2026-10-02.md`)
 
 ## Why this register exists
@@ -36,7 +36,7 @@ New gaps found **after** the audit, i.e. not covered by any verdict below — tr
 
 | Gap | Evidence | Owner action |
 |-----|----------|--------------|
-| crates.io publish chain was **false-green** since `493cfb01`: two releases (`v0.1.44`, `v0.1.45`) never uploaded | newest published `0.1.34` (mcp `0.1.31`) while `release.yml` run `38883104363` = `success`; publish step `conclusion=skipped` | ACT-399 (#1179) + ACT-402 (first publishing tag `v0.1.46`) |
+| crates.io publish chain was **false-green** since `493cfb01`: two releases (`v0.1.44`, `v0.1.45`) never uploaded | newest published `0.1.34` (mcp `0.1.31`) while `release.yml` run `38883104363` = `success`; publish step `conclusion=skipped` | ACT-399 (#1179) + ACT-402/ACT-409 (first publishing tag `v0.1.46`) |
 | Turso monitoring metrics could never be stored (SQL named columns the DDL does not create; `avg_duration_ms` written in seconds) | nightly run `38883104337`: `106 tests run: 70 passed, 36 failed` | ACT-401 (#1180) + ACT-406 (schema-vs-SQL sensor) |
 | Multi-dimension embedding reads queried a table that feature build never creates | `no such table: embeddings` under `turso_multi_dimension` | ACT-401 (#1180) |
 | Pooled call sites used the direct-connection accessor | `get_connection() is only available in direct-connection mode` | ACT-401 (#1180), residual callers under #1064 follow-up |

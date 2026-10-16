@@ -3,7 +3,7 @@
 - **Last Updated**: 2026-10-16
 - **Active plan**: **release closeout** — `GOAP_RELEASE_CLOSEOUT_2026-10-16.md` (ACT-399…ACT-409). `v0.1.45` shipped
   but published nothing to crates.io, and the Turso nightly has been red since 2026-10-13. The queue is serial and
-  starts with the `0.1.46` bump (ACT-402 → #1179 → #1177 → #1175 → #1180 → plans → tag `v0.1.46`).
+  starts with the closeout PR, which carries the `0.1.46` bump (ACT-402 → #1179 → #1177 → #1175 → #1180 → tag `v0.1.46`).
 - **Previous plan**: **audit-backlog wave** — `GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md`; W1–W6, Q02 and the wave-A
   slices all merged (ACT-370…ACT-398 closed), including #1153 as `b6326d90`.
 - **Earlier plan**: release pipeline hardening (#1109) — **code complete**: C1/C2 (#1123), C3/C4 (#1121), C5–C7 (#1125).
@@ -49,8 +49,8 @@ Full context, evidence and acceptance criteria: [`GOAP_RELEASE_CLOSEOUT_2026-10-
 |----|--------|-----|-----------|--------|
 | ACT-399 | Merge #1179: publish guard `inputs.dry-run != 'true'`, in-job `Verify publish landed` crates.io poll, membership-shaped version check, gate-contract + publish-fixture sensors | #1109 (release) | ACT-402 | 🔄 in review `3056b560` |
 | ACT-400 | Merge #1177: readiness gate counts the latest check run per name so superseded failures stop shadowing current ones | CI trust | after ACT-399 | 🔄 in review `479eb16d` |
-| ACT-401 | Merge #1175 → #1180 → plans closeout **serially** (strict up-to-date invalidates the others on every merge) | guardrails/tests | after ACT-400 | 🔄 #1175 `7d8dac23`, #1180 `34774f4d`, plans PR |
-| ACT-402 | **`0.1.46` bump PR — goes first**: workspace version + `Cargo.lock` + version references across the active plan set (template `b3d1b944`; it does not move the CHANGELOG heading — that happens at release). This is what makes the drift gate clean instead of overriding it | release | — | ⏳ acceptance: `check-release-drift.sh` → `severity=clean` on the PR |
+| ACT-401 | Merge #1175 → #1180 **serially** (strict up-to-date invalidates the others on every merge) | guardrails/tests | after ACT-400 | 🔄 #1175 `7d8dac23`, #1180 `34774f4d` |
+| ACT-402 | **`0.1.46` bump, landed in the closeout PR**: `Cargo.toml` + `Cargo.lock` + version references across the active plan set (template `b3d1b944`; the CHANGELOG heading moves at release time, not here). This is what makes the drift gate clean instead of overriding it | release | — | 🔄 in review — acceptance: `check-release-drift.sh` → `severity=clean` |
 | ACT-403 | Next nightly green (schedule + dispatch) with the new `turso_multi_dimension` step reporting 20/20 | #1091 (Q02) | after #1180 merges | ⏳ |
 | ACT-404 | `libsql 0.9.30 → 0.10.0` PR (both lockfiles) for 8 low alerts; record `lru` as upstream-blocked by `augurs-changepoint` → `rv 0.16` | Dependabot | — | ⏳ |
 | ACT-405 | Decide whether scheduled/tag nightly runs gate releases (`do_ci_check` `.event` filtering). Hardening only — never weaken the gate at ship time | release | after ACT-403 | ⏳ decision + ADR |
