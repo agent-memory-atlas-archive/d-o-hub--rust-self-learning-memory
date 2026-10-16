@@ -1,7 +1,7 @@
 # Plans Directory
 
 **Workspace**: `v0.1.46` (post-v0.1.45 bump) · **Released tag**: `v0.1.45` (`8ee711bd`, 2026-10-16) · **Main baseline**: `8ee711bd`
-**Active plan**: **release closeout** — [GOAP_RELEASE_CLOSEOUT_2026-10-16.md](GOAP_RELEASE_CLOSEOUT_2026-10-16.md) (ACT-399…ACT-410: the stalled crates.io publish, the red Turso nightly, the drift gate). The audit-backlog wave [GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md](GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md) is closed — W1–W6, Q02 and all wave-A slices merged (#1130…#1161). Per-issue register: [STATUS/GAP_ANALYSIS_LATEST.md](STATUS/GAP_ANALYSIS_LATEST.md).
+**Active plan**: **release closeout** — [GOAP_RELEASE_CLOSEOUT_2026-10-16.md](GOAP_RELEASE_CLOSEOUT_2026-10-16.md) (ACT-399…ACT-411: the stalled crates.io publish, the red Turso nightly, the drift gate). The audit-backlog wave [GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md](GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md) is closed — W1–W6, Q02 and all wave-A slices merged (#1130…#1161). Per-issue register: [STATUS/GAP_ANALYSIS_LATEST.md](STATUS/GAP_ANALYSIS_LATEST.md).
 **Completed previous wave**: v0.1.44 shipped 2026-10-02 (checked completion receipts #1107, CLI drain-and-verify #1112, pattern-search input bounds #1113, clippy 1.99 migration #1108, architecture/status refresh #1110, coverage-floor reconciliation #1117); release pipeline C1–C7 landed in #1121/#1123/#1125; workspace bumped to 0.1.45 post-release
 **Last Updated**: 2026-10-16
 **Open PRs**: run `gh pr list --state open` (17 on 2026-10-09) · **Open issues**: run `gh issue list --state open` (**16** — remaining audit backlog 1063/1064/1067/1068/1070/1071/1073/1074/1075/1076/1078/1085/1087/1089 + #1109 code-complete with manual crates.io steps + #1137 release drift)

@@ -31,7 +31,7 @@ Waiting on merges: #1068/#1089 (after #1149), #1074 (in flight), #1076 (after #1
 register merged. The other two are release-series: #1109 (manual crates.io registrations — maintainer-external)
 and #1165 (v0.1.45 drift, closes with the `0.1.46` bump).
 
-New gaps found **after** the audit, i.e. not covered by any verdict below — tracked as ACT-399…ACT-410 in
+New gaps found **after** the audit, i.e. not covered by any verdict below — tracked as ACT-399…ACT-411 in
 `ACTIONS.md` with evidence in `../GOAP_RELEASE_CLOSEOUT_2026-10-16.md` and `VALIDATION_LATEST.md`:
 
 | Gap | Evidence | Owner action |

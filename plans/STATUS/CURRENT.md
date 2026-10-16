@@ -115,7 +115,8 @@ restated at each refresh. Read any campaign claim as campaign-scoped; the repo-w
 | P0 | Cut tag `v0.1.46` after those land and verify every crate resolves on crates.io | ACT-409 | ⏳ |
 | P0 | `0.1.46` bump PR → tag `v0.1.46` → verify every crate resolves on crates.io **and** `Verify publish landed` green | ACT-402 | ⏳ |
 | P0 | Next nightly run green (scheduled + dispatch), including the new feature-specific step | ACT-403 | ⏳ |
-| P1 | Dependabot register is **upstream-blocked, not a bump away**: wait for libsql to move to hyper 1.x (clears the 8 `rustls-webpki`), for `augurs-changepoint`/`agentfs-sdk` to pass `lru 0.16.3`, and for a `libsql-sqlite3-parser` patch; keep `deny.toml`/`.cargo/audit.toml` waivers one-to-one with the open alerts | ACT-404 | ⏳ blocked upstream |
+| P1 | Dependabot register is **upstream-blocked, not a bump away**: wait for libsql to move to hyper 1.x (clears the 8 `rustls-webpki`), for `augurs-changepoint`/`agentfs-sdk` to pass `lru 0.16.3`, and for a `libsql-sqlite3-parser` patch; classify each alert as gated+ignored, informational-only, or Dependabot-only | ACT-404 | ⏳ blocked upstream |
+| P2 | Strip the auto-applied `release-preparation` label from the seven non-release PRs once the bump is on `main`; review parked #1171/#1172/#1176/#1178 with a tip-vs-merge-base diff before any merge | ACT-411 | ⏳ |
 | P1 | Sensors so this class of bug fails locally: schema-vs-SQL column check; LESSON + AGENTS trap entries for `required-features` vs `cfg_attr(…, ignore)` and error-swallowing asserts | ACT-406, ACT-407 | ⏳ |
 | P2 | Decide whether scheduled/tag nightly runs gate releases (`do_ci_check` `.event` filtering) — hardening only, never weakened at ship time | ACT-405 | ⏳ |
 | P2 | Follow-up watermark sync improvements (#1068, #1089) | S09/M08 | ⏳ post-closeout |

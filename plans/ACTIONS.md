@@ -1,7 +1,7 @@
 # GOAP Actions Backlog
 
 - **Last Updated**: 2026-10-16
-- **Active plan**: **release closeout** — `GOAP_RELEASE_CLOSEOUT_2026-10-16.md` (ACT-399…ACT-410). `v0.1.45` shipped
+- **Active plan**: **release closeout** — `GOAP_RELEASE_CLOSEOUT_2026-10-16.md` (ACT-399…ACT-411). `v0.1.45` shipped
   but published nothing to crates.io, and the Turso nightly has been red since 2026-10-13. The queue is serial and
   starts with the closeout PR, which carries the `0.1.46` bump (ACT-402 → #1179 → #1177 → #1175 → #1180 → tag `v0.1.46`).
 - **Previous plan**: **audit-backlog wave** — `GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md`; W1–W6, Q02 and the wave-A
@@ -54,6 +54,7 @@ Full context, evidence and acceptance criteria: [`GOAP_RELEASE_CLOSEOUT_2026-10-
 | ACT-403 | Next nightly green (schedule + dispatch) with the new `turso_multi_dimension` step reporting 20/20 | #1091 (Q02) | after #1180 merges | ⏳ |
 | ACT-404 | Dependabot register is **upstream-blocked**: 12 alerts = 6 advisories × 2 lockfiles (`Cargo.lock`, `fuzz/Cargo.lock`) — 8 `rustls-webpki 0.102.8` (2 high, via `libsql → hyper-rustls 0.25 → rustls 0.22.4`), 2 `lru <0.16.3` (via `augurs-changepoint 0.10.2` + `agentfs-sdk 0.6.4`, both newest), 2 `libsql-sqlite3-parser` (no patch). Do **not** open the `libsql 0.10.0` bump PR: 0.10.0 pulls the same chain (verified by `cargo tree` in a scratch crate) | Dependabot | — | ⏳ blocked upstream; re-test when libsql moves to hyper 1.x |
 | ACT-410 | Pin a dated `stable` for the advisory/lint gates so a floating toolchain cannot break compilation or invent deny lints between releases | toolchain | — (local hygiene) | ⏳ |
+| ACT-411 | Strip the auto-applied `release-preparation` label from #1171/#1172/#1175/#1176/#1177/#1179/#1180 once the bump is on `main`; review the parked #1171/#1172/#1176/#1178 on their own merits (tip-vs-merge-base diff first) | release drift | after ACT-402 | ⏳ |
 | ACT-405 | Decide whether scheduled/tag nightly runs gate releases (`do_ci_check` `.event` filtering). Hardening only — never weaken the gate at ship time | release | after ACT-403 | ⏳ decision + ADR |
 | ACT-406 | New `validate-schema-sql.sh` sensor: columns referenced in hand-written SQL vs the DDL constants, wired next to `validate-gate-contract.sh` in `skill-evals.yml` | Turso (S03) | after #1180 merges | ⏳ |
 | ACT-407 | LESSON + `AGENTS.md` trap entries: `required-features` vs `cfg_attr(…, ignore)` under `--run-ignored only`; asserts must print the `Err`; a step with `conclusion=skipped` in a green job is not evidence | Q02/Q03 | after #1175 merges (it owns both files) | ⏳ |
@@ -112,6 +113,7 @@ Maintainer-external items still open: ADR-079 stage 4 live fault-injection proof
 - Bot/agent PR branches can silently revert main: before merging any long-lived bot branch, diff the tip against `origin/main` and reject clobbers (PR #1130 tipped this)
 - Machine-readable test output can be empty: `--message-format libtest-json` needs `NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1`; assert report artifacts are non-empty before reading a red job as a test failure (PR #1159)
 - Dependabot (GHSA) alerts and `cargo audit`/`cargo deny` (RUSTSEC) are **different registers**: clearing the advisory-db gate closes zero Dependabot alerts (#1174 fixed audit, all 12 alerts stayed open), and one advisory can appear as several alerts — one per lockfile
+- An advisory is invisible to a gate in two ways, not one: RustSec `informational` advisories do not fail `cargo deny` advisories but do fail `cargo audit` (`lru` = RUSTSEC-2026-0002), and a GHSA that never reached RustSec (`libsql-sqlite3-parser`, CVE-2025-47736) passes **both** while Dependabot still counts it
 - Never plan a dependency-upgrade PR from a changelog claim: resolve the candidate version in a scratch crate and `cargo tree` it. That is how "libsql 0.10.0 clears 8 alerts" was disproved — 0.10.0 still pins `hyper-rustls 0.25 → rustls 0.22.4 → rustls-webpki 0.102.8`
 - Record an unfixable advisory as **upstream-blocked with the pinning chain named** (`augurs-changepoint 0.10.2` → `changepoint 0.14.2` → `rv 0.16.5` → `lru 0.9.0`), not as a to-do the next bump will close
 - Floating `stable` adds deny-by-default lints between releases (1.99: clippy `assert_is_empty`, rustdoc `redundant_explicit_links`): `rustup update stable` before diagnosing CI-only lint failures; fix, never suppress (PRs #1145/#1150/#1152)
