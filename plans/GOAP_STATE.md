@@ -3,8 +3,8 @@
 - **Last Updated**: 2026-10-16
 - **Version**: workspace `0.1.45` · latest tag `v0.1.45` (`8ee711bd`, GitHub Release published 2026-10-16)
 - **Branch**: `main` (`8ee711bd`) — no release branch; the post-release version bump is the next intentional PR
-- **Open PRs**: 9 open (run `gh pr list --state open`) — the release-closeout queue is #1179 → #1177 → #1175 →
-  #1180 → this plans PR, then the `0.1.46` bump PR (serial merges: `strict_required_status_checks_policy`)
+- **Open PRs**: 9 open (run `gh pr list --state open`) — the queue starts with the `0.1.46` bump PR (it clears
+  critical drift), then #1179 → #1177 → #1175 → #1180 → plans closeout (serial: `strict_required_status_checks_policy`)
 - **Open issues**: 5 open (run `gh issue list --state open`: #1068, #1076, #1089, #1109, #1165)
 - **Active plan**: **release closeout** — [`GOAP_RELEASE_CLOSEOUT_2026-10-16.md`](GOAP_RELEASE_CLOSEOUT_2026-10-16.md)
   (publish stall, red nightly, drift gate); audit-backlog follow-ups #1068/#1076/#1089 remain queued behind it
@@ -50,8 +50,10 @@ Adjacent merges: #1128 docs-integrity, #1133 local hook sensors, #1136 dependabo
 
 ## Next queue
 
-- **Merge pipeline (serial, forced by strict up-to-date)**: #1179 publish guard → #1177 readiness gate →
-  #1175 guardrail docs → #1180 nightly Turso → plans closeout → `0.1.46` bump PR (the publish vehicle) → tag.
+- **Merge pipeline (serial, forced by strict up-to-date + drift gate)**: `0.1.46` bump PR **first** (it makes
+  `check-release-drift.sh` clean instead of overriding it with `release-preparation`) → #1179 publish guard →
+  #1177 readiness gate → #1175 guardrail docs → #1180 nightly Turso → plans closeout → tag `v0.1.46`, which is
+  the publish vehicle because the chain runs from the tag SHA.
 - **Publish repair (ACT-402)**: `v0.1.44`/`v0.1.45` never reached crates.io; `0.1.46` must be verified with
   `index("0.1.46") != null` per crate **and** a green `Verify publish landed`.
 - **Nightly repair (ACT-403)**: #1180 turns the 36-failure nightly green and exposes four real defects

@@ -25,23 +25,35 @@
 ## 2. Merge pipeline (order is forced, not preferred)
 
 Ruleset `main-protection` has `strict_required_status_checks_policy`, so **merges are serial** and each merge
-invalidates every other PR's required runs. Blocking graph:
+invalidates every other PR's required runs. On top of that, `check-release-drift.sh` reports
+`severity=critical reason=version_not_advanced` whenever `workspace_version == latest_tag` **and**
+`v<tag>..HEAD` has any commit — which is exactly the post-release state. The `Enforce release cadence` step is
+skipped only for a PR carrying `release-preparation`, which is reserved for the release PR itself.
+
+**Therefore the version bump goes first.** It is the only change that makes the gate honest: no label override on
+an unrelated PR, no waiver, nothing skipped. After it merges, every PR below evaluates
+`workspace_version=0.1.46 > latest_tag=v0.1.45` → `is_valid_next_version` → clean.
 
 ```
-#1179 publish guard   ─┐  (must be in main before the tag that publishes)
-#1177 readiness gate  ─┤  (latest-run-per-name; makes the drift re-run readable)
-#1175 guardrail docs  ─┤  (owns AGENTS.md + agent_docs/LESSONS.md — nothing else may touch them)
-#1180 nightly Turso   ─┤  (fixes the red nightly; owns memory-storage-turso/*)
-docs closeout (this)  ─┘  (plans/ only — no file overlap with the above)
+0.1.46 bump PR  ────► clears critical drift for the whole queue (b3d1b944 is the template:
+        │               Cargo.toml + Cargo.lock + version references across plans/; it does
+        │               NOT move the CHANGELOG [Unreleased] heading — that happens at release)
+        ▼
+#1179 publish guard   (must be in main before the tag: the chain runs from the tag SHA)
+#1177 readiness gate  (latest-run-per-name)
+#1175 guardrail docs  (owns AGENTS.md + agent_docs/LESSONS.md)
+#1180 nightly Turso   (owns memory-storage-turso/*)
+plans closeout (this) (plans/ only)
         │
         ▼
-0.1.46 bump PR  ──► tag v0.1.46 ──► release.yml ──► publish-crates.yml (first real publish)
+tag v0.1.46 ──► release.yml ──► publish-crates.yml (first real publish)
 ```
 
-Why the bump PR is the only publish vehicle: `release.yml` dispatches `publish-crates.yml --ref <tag>`, so both
-the workflow **and** `.github/actions/publish-crate` come from the tag. `v0.1.45` @ `8ee711bd` carries the broken
-guard, and `Verify tag matches version` refuses a tag that does not equal the manifest. **No retag, no manual
-`cargo publish`, no static token** (OIDC-only per ADR-078; tag-only authority per ADR-072).
+Why the tag must come last: `release.yml` dispatches `publish-crates.yml --ref <tag>`, so both the workflow **and**
+`.github/actions/publish-crate` come from the tag. `v0.1.45` @ `8ee711bd` carries the broken guard, and
+`Verify tag matches version` refuses a tag that does not equal the manifest. **No retag, no manual
+`cargo publish`, no static token** (OIDC-only per ADR-078; tag-only authority per ADR-072). The bump PR only
+advances the version; the fix reaches crates.io when `v0.1.46` is cut after #1179 is in `main`.
 
 `0.1.46` will publish `do-memory-mcp` for the first time since `0.1.31`, and everything since `0.1.34`.
 
@@ -77,16 +89,17 @@ cargo nextest run -p do-memory-storage-turso --features turso_multi_dimension \
 
 | ID | Action | Depends on | Acceptance |
 |----|--------|-----------|------------|
-| ACT-399 | Merge #1179 (publish guard `inputs.dry-run != 'true'`, `Verify publish landed`, membership-shaped version check, gate-contract + publish-fixture sensors) | terminal-green CI incl. Codacy | merged to `main`; `./scripts/validate-gate-contract.sh --ci-parity` PASS |
+| ACT-399 | Merge #1179 (publish guard `inputs.dry-run != 'true'`, `Verify publish landed`, membership-shaped version check, gate-contract + publish-fixture sensors) | after ACT-402 | merged to `main`; `./scripts/validate-gate-contract.sh --ci-parity` PASS |
 | ACT-400 | Merge #1177 (readiness gate counts the **latest** run per check name) | after ACT-399 | merged; the stale `Check for unreleased changes` failures on #1179 no longer shadow its green re-run |
 | ACT-401 | Merge #1175 (guardrail docs) then #1180 (nightly Turso) then this plans PR, serially | after ACT-400 | each merged via `./scripts/merge-pr.sh <n> --execute` only |
-| ACT-402 | **0.1.46 bump PR** — workspace version, `Cargo.lock`, version docs, `## [Unreleased]` → `## [0.1.46]`; it is the vehicle that actually publishes | after ACT-401 | `do-memory-core`, `-storage-redb`, `-storage-turso`, `-mcp` all answer `index("0.1.46") != null` on crates.io **and** `Verify publish landed` green in every job |
+| ACT-402 | **0.1.46 bump PR — first in the queue**: workspace version, `Cargo.lock`, version references across the active plan set (template `b3d1b944`); it is what makes the drift gate clean instead of overriding it | nothing (main @ `8ee711bd`) | `./scripts/check-release-drift.sh` on the PR → `severity=clean`; `validate-plans.sh` + `check-docs-integrity.sh` green |
+| ACT-409 | **Cut tag `v0.1.46`** once ACT-399…ACT-401 land, then verify the publish (this is the "publish the stalled versions" step) | ACT-399, ACT-401 | `do-memory-core`, `-storage-redb`, `-storage-turso`, `-mcp` all answer `index("0.1.46") != null` on crates.io **and** `Verify publish landed` green in every job |
 | ACT-403 | Next nightly run green (scheduled + `workflow_dispatch`) | after #1180 merges | `gh run list --workflow nightly-tests.yml --limit 1` → `success`; the two feature-gated suites reported in the dedicated step, 20/20 |
 | ACT-404 | `libsql 0.9.30 → 0.10.0` upgrade PR (both lockfiles) to clear 8 of the 12 Dependabot alerts | none | alerts 0; `cargo audit` clean; record `lru` as **upstream-blocked** by `augurs-changepoint`'s `rv 0.16` pin rather than pretending it is fixable |
 | ACT-405 | Decide whether scheduled/tag-triggered nightly runs gate releases (`do_ci_check` `.event` filtering) | ACT-403 | written decision + ADR. **Hardening only** — never weaken the gate at ship time; the shipped answer for this release was "ship inside the window" with the red nightly explained above |
 | ACT-406 | Schema-vs-SQL sensor: a new `validate-schema-sql.sh` (to live beside `validate-gate-contract.sh` in the scripts dir) compares columns referenced in hand-written SQL against the DDL constants, wired into `skill-evals.yml` | after #1180 merges | RC4 class of bug fails locally, not in nightly |
 | ACT-407 | LESSON-055 + AGENTS.md trap bullet: feature-gated suites need `required-features` (not `cfg_attr(..., ignore)`) because nightly forces ignored tests; asserts must print the `Err`; a green job whose only real step is `conclusion=skipped` is not evidence | after #1175 merges (it owns both files) | entries land on a follow-up docs branch |
-| ACT-408 | Close #1165 (v0.1.45 drift issue) with the release evidence, and re-check #1068/#1089/#1076/#1109 queue positions | ACT-402 | issue list matches the register in `STATUS/GAP_ANALYSIS_LATEST.md` |
+| ACT-408 | Close #1165 (v0.1.45 drift issue) with the release evidence, and re-check #1068/#1089/#1076/#1109 queue positions | ACT-409 | issue list matches the register in `STATUS/GAP_ANALYSIS_LATEST.md` |
 
 ## 5. Standing constraints this closeout was executed under
 
@@ -94,6 +107,10 @@ cargo nextest run -p do-memory-storage-turso --features turso_multi_dimension \
   `--admin`, `--force`, `--no-verify`, no run deletions, no soft-pass on a required check.
 - Releases only via the `release-guard` skill + `./scripts/release-manager.sh ship --execute`; **never**
   `gh release create`.
+- `release-preparation` is the release PR's own label. Putting it on an unrelated PR to silence
+  `version_not_advanced` is an override, not a fix — the fix is the version bump (ACT-402). Earlier runs of this
+  closeout used the label on #1179 to re-trigger the check; that is recorded here as the deadlock breaker it is,
+  not as the intended path.
 - Merges only via `./scripts/merge-pr.sh <PR> --execute`.
 - Known pre-existing local-only failure, reproduced on untouched `main` and therefore not attributable to #1180:
   `cargo clippy --all-targets` reports unfulfilled `#![expect(...)]` in `test-utils/src/lib.rs` under the local
