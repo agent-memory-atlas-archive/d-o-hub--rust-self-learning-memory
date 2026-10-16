@@ -15,7 +15,7 @@ bump. Follow-up issues #1068, #1089 and #1076 stay queued behind it.
 | Kind | Items |
 |------|--------|
 | Open PRs | live list — run `gh pr list --state open`; the release-closeout queue merges serially (order in the active plan under `plans/`), then the post-release bump PR |
-| Open issues | 5 open (run `gh issue list --state open` — #1068, #1076, #1089, #1109, #1165) — per-issue verdicts, evidence and queue position live in `STATUS/GAP_ANALYSIS_LATEST.md` |
+| Open issues | 6 open (run `gh issue list --state open` — #1068, #1076, #1089, #1109, #1165, #1182) — per-issue verdicts, evidence and queue position live in `STATUS/GAP_ANALYSIS_LATEST.md` |
 | Open Dependabot alerts | 12 (2 high, 2 medium, 8 low) = **6 advisories duplicated across `Cargo.lock` + `fuzz/Cargo.lock`**, all upstream-blocked (`rustls-webpki 0.102.8` via the libsql→rustls 0.22 chain, `lru <0.16.3` via `augurs-changepoint`/`agentfs-sdk`, unpatched `libsql-sqlite3-parser`). #1174 cleared `cargo audit`/`cargo deny`, **not** these — `libsql 0.10.0` would change none of them |
 
 ## Corrected claim (2026-10-04)
@@ -95,7 +95,7 @@ restated at each refresh. Read any campaign claim as campaign-scoped; the repo-w
 | Area | State |
 |------|--------|
 | First-party merge gate | ✅ **Live** — ruleset `9591004` requires `Codacy Static Code Analysis` + `CI / Required` (strict up-to-date policy); the aggregate is causally same-run and rejects `skipped`/`cancelled`/timed-out results |
-| Repo-wide open issues | **5 open**: #1068, #1076, #1089 (audit follow-ups), #1109 (manual crates.io registrations, maintainer-external), #1165 (v0.1.45 drift — closes with the `0.1.46` bump) — register: `STATUS/GAP_ANALYSIS_LATEST.md` |
+| Repo-wide open issues | 6 (the authoritative count + list is the **Open issues** row under *Open tracker (live)* — keep it in that one place; this row carried a stale copy of it). Note on **#1182**: the canonical `release-drift` issue, filed and updated **in place** by the `maintain-issue` job at `release-drift.yml:98-149` because `version_not_advanced` is the normal post-ship state — do not close it by hand, it resolves when the `0.1.46` bump lands |
 | Merged since 2026-10-06 | #1130, #1142, #1143, #1148, #1138, #1140, #1144, #1145, #1146, #1147, #1149, #1150, #1151, #1152, #1154, #1158, #1159, #1160, #1161, #1153, #1174 |
 | Production pattern query relevance | ✅ **#1074 merged in #1160** — pattern operations use one runtime provider snapshot |
 | `episodes.created_at` watermark | ✅ **#1067 merged in #1149** — durable modification watermark and bounded keyset pages |
