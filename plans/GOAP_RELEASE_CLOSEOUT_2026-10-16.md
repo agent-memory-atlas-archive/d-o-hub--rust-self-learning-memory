@@ -42,7 +42,7 @@ the queue evaluates `workspace_version=0.1.46 > latest_tag=v0.1.45` → `is_vali
 ```
 this PR: plans closeout + 0.1.46 bump  ──► clears critical drift for the whole queue
         │   (Cargo.toml + Cargo.lock + version references across the active plan set, template
-        │    b3d1b944; it does NOT move the CHANGELOG [Unreleased] heading — that happens at release)
+        │    b3d1b944; it does NOT move the CHANGELOG [Unreleased] heading — see §2a)
         ▼
 #1179 publish guard   (must be in main before the tag: the chain runs from the tag SHA)
 #1177 readiness gate  (latest-run-per-name)
@@ -50,8 +50,33 @@ this PR: plans closeout + 0.1.46 bump  ──► clears critical drift for the w
 #1180 nightly Turso   (owns memory-storage-turso/*)
         │
         ▼
+release-prep PR (ACT-412): CHANGELOG ## [0.1.46] + version-doc flip  ──► verify-release-state clean
+        │
+        ▼
 tag v0.1.46 ──► release.yml ──► publish-crates.yml (first real publish)
 ```
+
+### 2a. Ship-time preconditions, run before the tag (ACT-412)
+
+`release-manager.sh ship` starts with `./scripts/verify-release-state.sh --check-unreleased` (Phase 0), and that
+validator checks the docs **against `workspace_version`**, not against the latest tag. Executed on this branch:
+
+```
+./scripts/verify-release-state.sh --check-unreleased
+  ✅ every member crate = 0.1.46
+  ❌ plans/ROADMAPS/ROADMAP_ACTIVE.md says v0.1.45 (expected v0.1.46)
+  ❌ plans/STATUS/CURRENT.md references v0.1.45 (expected v0.1.46)
+  ❌ CHANGELOG.md missing entry for v0.1.46
+  ✅ No unreleased feat/fix commits · ✅ no duplicate ## [X.Y.Z] headings
+  ⚠️  parse-changelog not installed (the check release.yml actually depends on)
+❌ FAILED: 3 version mismatches
+```
+
+So the tag cannot be cut straight after #1180: the `Released Version`/`Workspace Version` docs and the
+`## [0.1.46]` CHANGELOG section must be on `main` first, exactly as `#1169` did for `v0.1.45` ("prepare v0.1.45
+changelog and version docs"). The CHANGELOG section also has to be written **after** #1179/#1177/#1175/#1180 land,
+because their fix entries belong in it — which is why it is a separate PR rather than a commit on this one. Install
+`parse-changelog-cli` locally so the same parser `release.yml` uses gates the heading format before ship.
 
 Why the tag must come last: `release.yml` dispatches `publish-crates.yml --ref <tag>`, so both the workflow **and**
 `.github/actions/publish-crate` come from the tag. `v0.1.45` @ `8ee711bd` carries the broken guard, and
@@ -97,7 +122,8 @@ cargo nextest run -p do-memory-storage-turso --features turso_multi_dimension \
 | ACT-400 | Merge #1177 (readiness gate counts the **latest** run per check name) | after ACT-399 | merged; the stale `Check for unreleased changes` failures on #1179 no longer shadow its green re-run |
 | ACT-401 | Merge #1175 (guardrail docs) then #1180 (nightly Turso), serially | after ACT-400 | each merged via `./scripts/merge-pr.sh <n> --execute` only |
 | ACT-402 | **`0.1.46` version bump — landed in this PR**: `Cargo.toml` + `Cargo.lock` + version references across the active plan set (template `b3d1b944`). It is what makes the drift gate clean instead of overriding it | nothing (this PR) | `./scripts/check-release-drift.sh` → `severity=clean reason=within_cadence`; `validate-plans.sh` + `check-docs-integrity.sh` green |
-| ACT-409 | **Cut tag `v0.1.46`** once ACT-399…ACT-401 land, then verify the publish (this is the "publish the stalled versions" step) | ACT-399, ACT-401 | `do-memory-core`, `-storage-redb`, `-storage-turso`, `-mcp` all answer `index("0.1.46") != null` on crates.io **and** `Verify publish landed` green in every job |
+| ACT-409 | **Cut tag `v0.1.46`** once ACT-399…ACT-401 **and ACT-412** land, then verify the publish (this is the "publish the stalled versions" step) | ACT-399, ACT-401, ACT-412 | `do-memory-core`, `-storage-redb`, `-storage-turso`, `-mcp` all answer `index("0.1.46") != null` on crates.io **and** `Verify publish landed` green in every job |
+| ACT-412 | **Release-prep PR, after #1180 merges and before the tag**: `CHANGELOG.md` `## [0.1.46]` section (fed by the four PRs' fix entries), the `Released Version`/version-doc flip, and `cargo install parse-changelog-cli` so the local check matches `release.yml`'s parser | ACT-399…ACT-401 | `./scripts/verify-release-state.sh --check-unreleased` → 0 mismatches and `parse-changelog CHANGELOG.md 0.1.46` extracts a section; that PR is the one carrying `release-preparation` legitimately |
 | ACT-403 | Next nightly run green (scheduled + `workflow_dispatch`) | after #1180 merges | `gh run list --workflow nightly-tests.yml --limit 1` → `success`; the two feature-gated suites reported in the dedicated step, 20/20 |
 | ACT-404 | **Do not** open a `libsql 0.9.30 → 0.10.0` PR expecting alerts to close (verified above: 0.10.0 still ships the `rustls 0.22.4` chain). Instead track the three real unblockers: (1) libsql migrating `hyper-rustls 0.25`/hyper 0.14 → 0.27/hyper 1.x (frees the 8 `rustls-webpki` alerts, 2 high), (2) `augurs-changepoint` and `agentfs-sdk` moving past `lru <0.16.3` (2 low), (3) upstream patching `libsql-sqlite3-parser` (2 low, no fix exists) | none | each blocked package names its pinning chain and the upstream repo that owns the fix in `STATUS/GAP_ANALYSIS_LATEST.md`; every open alert is classified as **gated+ignored**, **informational-only** (RustSec `informational`, so `cargo deny` does not gate it) or **Dependabot-only** (no RustSec entry — invisible to both gates); a bump PR opens **only** when upstream actually moves |
 | ACT-410 | Pin a dated `stable` for the advisory/lint gates so a floating toolchain cannot break compilation or invent deny lints between releases | none (local hygiene) | the `#![expect(clippy::expect_used)]` failure in `test-utils/src/lib.rs` stops reproducing on the pinned toolchain; `cargo clippy --all-targets -D warnings` clean locally and in CI |

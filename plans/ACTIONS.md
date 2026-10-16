@@ -1,7 +1,7 @@
 # GOAP Actions Backlog
 
 - **Last Updated**: 2026-10-16
-- **Active plan**: **release closeout** — `GOAP_RELEASE_CLOSEOUT_2026-10-16.md` (ACT-399…ACT-411). `v0.1.45` shipped
+- **Active plan**: **release closeout** — `GOAP_RELEASE_CLOSEOUT_2026-10-16.md` (ACT-399…ACT-412). `v0.1.45` shipped
   but published nothing to crates.io, and the Turso nightly has been red since 2026-10-13. The queue is serial and
   starts with the closeout PR, which carries the `0.1.46` bump (ACT-402 → #1179 → #1177 → #1175 → #1180 → tag `v0.1.46`).
 - **Previous plan**: **audit-backlog wave** — `GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md`; W1–W6, Q02 and the wave-A
@@ -58,7 +58,8 @@ Full context, evidence and acceptance criteria: [`GOAP_RELEASE_CLOSEOUT_2026-10-
 | ACT-405 | Decide whether scheduled/tag nightly runs gate releases (`do_ci_check` `.event` filtering). Hardening only — never weaken the gate at ship time | release | after ACT-403 | ⏳ decision + ADR |
 | ACT-406 | New `validate-schema-sql.sh` sensor: columns referenced in hand-written SQL vs the DDL constants, wired next to `validate-gate-contract.sh` in `skill-evals.yml` | Turso (S03) | after #1180 merges | ⏳ |
 | ACT-407 | LESSON + `AGENTS.md` trap entries: `required-features` vs `cfg_attr(…, ignore)` under `--run-ignored only`; asserts must print the `Err`; a step with `conclusion=skipped` in a green job is not evidence | Q02/Q03 | after #1175 merges (it owns both files) | ⏳ |
-| ACT-409 | **Cut tag `v0.1.46`** once ACT-399…ACT-401 land — the first tag that can publish, because the chain runs from the tag SHA | release | after ACT-399, ACT-401 | ⏳ acceptance: `index("0.1.46") != null` for core/redb/turso/mcp **and** `Verify publish landed` green |
+| ACT-409 | **Cut tag `v0.1.46`** once ACT-399…ACT-401 **and ACT-412** land — the first tag that can publish, because the chain runs from the tag SHA | release | after ACT-399, ACT-401, ACT-412 | ⏳ acceptance: `index("0.1.46") != null` for core/redb/turso/mcp **and** `Verify publish landed` green |
+| ACT-412 | **Release-prep PR before the tag**: `CHANGELOG.md` `## [0.1.46]` section + the `Released Version`/version-doc flip, because `release-manager.sh` Phase 0 runs `verify-release-state.sh --check-unreleased`, which today reports 3 mismatches (`ROADMAP_ACTIVE says v0.1.45`, `CURRENT references v0.1.45`, `CHANGELOG missing entry for v0.1.46`) and would refuse to ship. Also install `parse-changelog-cli` so the local check uses the parser `release.yml` uses | release | after ACT-401 (#1180) | ⏳ this is the PR that legitimately carries `release-preparation` |
 | ACT-408 | Close #1165 with the release evidence; re-queue #1068/#1089/#1076 behind the closeout | release drift | after ACT-409 | ⏳ |
 
 ## Queued actions (2026-10-04 — validated backlog, sequenced)
@@ -112,6 +113,7 @@ Maintainer-external items still open: ADR-079 stage 4 live fault-injection proof
 - Codecov patch coverage: dedupe duplicated rendering (removes uncovered lines from the denominator) AND add targeted tests for new core paths
 - Bot/agent PR branches can silently revert main: before merging any long-lived bot branch, diff the tip against `origin/main` and reject clobbers (PR #1130 tipped this)
 - Machine-readable test output can be empty: `--message-format libtest-json` needs `NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1`; assert report artifacts are non-empty before reading a red job as a test failure (PR #1159)
+- A version bump alone does not make a repo shippable: `release-manager.sh` Phase 0 runs `verify-release-state.sh --check-unreleased`, which validates `CHANGELOG.md` and the version-doc lines against **`workspace_version`**. Run it before promising a tag date, and land the CHANGELOG/doc flip in a release-prep PR (the pattern #1169 used for v0.1.45)
 - Dependabot (GHSA) alerts and `cargo audit`/`cargo deny` (RUSTSEC) are **different registers**: clearing the advisory-db gate closes zero Dependabot alerts (#1174 fixed audit, all 12 alerts stayed open), and one advisory can appear as several alerts — one per lockfile
 - An advisory is invisible to a gate in two ways, not one: RustSec `informational` advisories do not fail `cargo deny` advisories but do fail `cargo audit` (`lru` = RUSTSEC-2026-0002), and a GHSA that never reached RustSec (`libsql-sqlite3-parser`, CVE-2025-47736) passes **both** while Dependabot still counts it
 - Never plan a dependency-upgrade PR from a changelog claim: resolve the candidate version in a scratch crate and `cargo tree` it. That is how "libsql 0.10.0 clears 8 alerts" was disproved — 0.10.0 still pins `hyper-rustls 0.25 → rustls 0.22.4 → rustls-webpki 0.102.8`
