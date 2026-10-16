@@ -31,7 +31,7 @@ Waiting on merges: #1068/#1089 (after #1149), #1074 (in flight), #1076 (after #1
 register merged. The other two are release-series: #1109 (manual crates.io registrations — maintainer-external)
 and #1165 (v0.1.45 drift, closes with the `0.1.46` bump).
 
-New gaps found **after** the audit, i.e. not covered by any verdict below — tracked as ACT-399…ACT-409 in
+New gaps found **after** the audit, i.e. not covered by any verdict below — tracked as ACT-399…ACT-410 in
 `ACTIONS.md` with evidence in `../GOAP_RELEASE_CLOSEOUT_2026-10-16.md` and `VALIDATION_LATEST.md`:
 
 | Gap | Evidence | Owner action |
@@ -41,7 +41,7 @@ New gaps found **after** the audit, i.e. not covered by any verdict below — tr
 | Multi-dimension embedding reads queried a table that feature build never creates | `no such table: embeddings` under `turso_multi_dimension` | ACT-401 (#1180) |
 | Pooled call sites used the direct-connection accessor | `get_connection() is only available in direct-connection mode` | ACT-401 (#1180), residual callers under #1064 follow-up |
 | Nightly test *configuration* could report a schema mismatch as a storage bug | `#[ignore]` + `--run-ignored only` ignores feature gating | ACT-403, ACT-407 |
-| 12 Dependabot alerts (8 low need `libsql 0.10.0`; `lru` blocked upstream by `augurs-changepoint` → `rv 0.16`) | `gh api repos/:owner/:repo/dependabot/alerts?state=open` | ACT-404 |
+| 12 Dependabot alerts = **6 advisories × 2 lockfiles** (`Cargo.lock`, `fuzz/Cargo.lock`), **all upstream-blocked**: 8 × `rustls-webpki 0.102.8` (2 high) via `libsql 0.9.30/0.10.0 → hyper-rustls 0.25 → rustls 0.22.4`; 2 × `lru <0.16.3` via `augurs-changepoint 0.10.2 → changepoint 0.14.2 → rv 0.16.5` and `agentfs-sdk 0.6.4`; 2 × `libsql-sqlite3-parser ≤0.13.0` with **no patched release** (CVE-2025-47736). `cargo audit`/`cargo deny` were cleared separately by #1174, which closed none of these | `gh api repos/:owner/:repo/dependabot/alerts?state=open --paginate` + `cargo tree` on a scratch `libsql 0.10.0` crate | ACT-404 (wait for upstream: tursodatabase/libsql, Manishearth/llru-rs, augurs-project/augurs) |
 
 ## Register — 22 open issues
 

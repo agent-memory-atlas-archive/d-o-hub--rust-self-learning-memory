@@ -58,8 +58,11 @@ Adjacent merges: #1128 docs-integrity, #1133 local hook sensors, #1136 dependabo
   `index("0.1.46") != null` per crate **and** a green `Verify publish landed`.
 - **Nightly repair (ACT-403)**: #1180 turns the 36-failure nightly green and exposes four real defects
   (metrics column/unit drift, multi-dimension read gap, pooled-checkout misuse, error-swallowing asserts).
-- **Dependabot (ACT-404)**: 12 alerts open; `libsql 0.9.30 → 0.10.0` clears 8, `lru` is upstream-blocked by
-  `augurs-changepoint`'s `rv 0.16` pin.
+- **Dependabot (ACT-404)**: 12 alerts open, but they are **6 advisories duplicated across `Cargo.lock` and
+  `fuzz/Cargo.lock`** and all are upstream-blocked: 8 × `rustls-webpki 0.102.8` (2 high) reached only through
+  `libsql → hyper-rustls 0.25 → rustls 0.22.4`, 2 × `lru <0.16.3` through `augurs-changepoint 0.10.2` and
+  `agentfs-sdk 0.6.4` (both already newest), 2 × `libsql-sqlite3-parser` with no upstream patch. `libsql 0.10.0`
+  changes none of this (verified with a scratch `cargo tree`), so no bump PR is planned until upstream moves.
 - **Watermark follow-ups**: #1068, #1089 remain queued after the merged #1149 implementation.
 - **Embedding follow-up**: #1076 remains queued after merged #1151/#1160 implementations.
 - **Release/closeout**: `v0.1.45` shipped; #1109 manual crates.io registrations + secret deletion remain

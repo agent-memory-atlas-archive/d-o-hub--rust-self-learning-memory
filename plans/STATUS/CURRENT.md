@@ -16,7 +16,7 @@ bump. Follow-up issues #1068, #1089 and #1076 stay queued behind it.
 |------|--------|
 | Open PRs | live list — run `gh pr list --state open`; the release-closeout queue merges serially (order in the active plan under `plans/`), then the post-release bump PR |
 | Open issues | 5 open (run `gh issue list --state open` — #1068, #1076, #1089, #1109, #1165) — per-issue verdicts, evidence and queue position live in `STATUS/GAP_ANALYSIS_LATEST.md` |
-| Open Dependabot alerts | 12 (2 high, 2 moderate, 8 low) — high/moderate fixed on `main` via #1174; the 8 low need `libsql 0.10.0` |
+| Open Dependabot alerts | 12 (2 high, 2 medium, 8 low) = **6 advisories duplicated across `Cargo.lock` + `fuzz/Cargo.lock`**, all upstream-blocked (`rustls-webpki 0.102.8` via the libsql→rustls 0.22 chain, `lru <0.16.3` via `augurs-changepoint`/`agentfs-sdk`, unpatched `libsql-sqlite3-parser`). #1174 cleared `cargo audit`/`cargo deny`, **not** these — `libsql 0.10.0` would change none of them |
 
 ## Corrected claim (2026-10-04)
 
@@ -115,7 +115,7 @@ restated at each refresh. Read any campaign claim as campaign-scoped; the repo-w
 | P0 | Cut tag `v0.1.46` after those land and verify every crate resolves on crates.io | ACT-409 | ⏳ |
 | P0 | `0.1.46` bump PR → tag `v0.1.46` → verify every crate resolves on crates.io **and** `Verify publish landed` green | ACT-402 | ⏳ |
 | P0 | Next nightly run green (scheduled + dispatch), including the new feature-specific step | ACT-403 | ⏳ |
-| P1 | `libsql 0.9.30 → 0.10.0` PR (8 low alerts); record `lru` as upstream-blocked by `augurs-changepoint` → `rv 0.16` | ACT-404 | ⏳ |
+| P1 | Dependabot register is **upstream-blocked, not a bump away**: wait for libsql to move to hyper 1.x (clears the 8 `rustls-webpki`), for `augurs-changepoint`/`agentfs-sdk` to pass `lru 0.16.3`, and for a `libsql-sqlite3-parser` patch; keep `deny.toml`/`.cargo/audit.toml` waivers one-to-one with the open alerts | ACT-404 | ⏳ blocked upstream |
 | P1 | Sensors so this class of bug fails locally: schema-vs-SQL column check; LESSON + AGENTS trap entries for `required-features` vs `cfg_attr(…, ignore)` and error-swallowing asserts | ACT-406, ACT-407 | ⏳ |
 | P2 | Decide whether scheduled/tag nightly runs gate releases (`do_ci_check` `.event` filtering) — hardening only, never weakened at ship time | ACT-405 | ⏳ |
 | P2 | Follow-up watermark sync improvements (#1068, #1089) | S09/M08 | ⏳ post-closeout |
