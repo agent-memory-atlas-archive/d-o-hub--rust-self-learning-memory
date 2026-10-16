@@ -14,7 +14,7 @@
 | Fact | Evidence |
 |------|----------|
 | `v0.1.45` is released on GitHub | `gh release list` → `v0.1.45  2026-10-16T10:30:09Z`; tag → `8ee711bd` |
-| …but **nothing was published to crates.io** | `do-memory-core`/`-storage-redb`/`-storage-turso` newest `0.1.34`, `do-memory-mcp` newest `0.1.31`; `v0.1.44` and `v0.1.45` never appeared |
+| …but **nothing was published to crates.io** | `do-memory-core`/`-storage-redb`/`-storage-turso` newest `0.1.34`, `do-memory-mcp` newest `0.1.31`; `v0.1.44` and `v0.1.45` never appeared. The publish chain owns exactly those **4** crates (`publish-crates.yml`: core → redb → turso → mcp) — `do-memory-cli` is 404 by design (it ships as a Release asset) and `do-memory-test-utils` is `publish = false`, so ACT-409's acceptance is 4 crates, not 6 |
 | The publish run reported **success** | `gh run list --workflow release.yml` → `38883104363  8ee711bd  success  push`; the dispatched `publish-crates.yml` run `38887674688` shows `Publish to crates.io` with `conclusion=skipped;duration_ms=0` |
 | Nightly has been red since 2026-10-13 | `gh run list --workflow nightly-tests.yml --limit 5` → five consecutive `failure` (schedule + push) |
 | Pre-fix baseline is exactly **36 failures / 106 run** | run `38883104337` job log: `Summary [3.200s] 106 tests run: 70 passed, 36 failed, 514 skipped` |

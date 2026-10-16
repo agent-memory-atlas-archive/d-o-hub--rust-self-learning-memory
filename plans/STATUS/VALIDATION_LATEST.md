@@ -25,19 +25,24 @@ evidence attached to each head SHA (PR monitoring guardrail from the `goap-agent
 |------|----------|
 | `v0.1.45` tagged + released | tag → `8ee711bd` (#1169 merge); `gh release list` → published 2026-10-16T10:30:09Z; shipped via `./scripts/release-manager.sh ship --execute` |
 | 2 high + 2 moderate advisories cleared | #1174 merged as `2d5ed2b0`; `main` CI green |
-| **crates.io did NOT receive `v0.1.44`/`v0.1.45`** | newest published: `do-memory-core`/`-storage-redb`/`-storage-turso` = `0.1.34`, `do-memory-mcp` = `0.1.31`; release run `38883104363` = `success` |
+| **crates.io did NOT receive `v0.1.44`/`v0.1.45`** | newest published: `do-memory-core`/`-storage-redb`/`-storage-turso` = `0.1.34`, `do-memory-mcp` = `0.1.31`; release run `38883104363` = `success`. The publish chain is exactly those **4** crates (`publish-crates.yml`: core → redb → turso → mcp); `do-memory-cli` answers 404 because it ships as a GitHub Release asset and `do-memory-test-utils` is `publish = false` (`test-utils/Cargo.toml:6`), so neither 404 is a publish failure |
 | …because the publish step was skipped while green | dispatched run `38887674688`: `Check if version exists` → `Crates.io latest: 0.1.34 / will publish`, `Authenticate … Retrieved token successfully`, `Publish to crates.io` → `conclusion=skipped;duration_ms=0` |
 | Nightly red since 2026-10-13 | `gh run list --workflow nightly-tests.yml --limit 5` → 5 × `failure`; run `38883104337` (`8ee711bd`) → `106 tests run: 70 passed, 36 failed, 514 skipped` |
 
 ## In review (head SHA + evidence at 2026-10-16)
 
+`main` advanced twice while this closeout was in review — `8ee711bd` (#1169, the `v0.1.45` release merge) then
+`791c01a3` (#1173 docs sync, 13:11Z). Under `strict_required_status_checks_policy` each advance puts every branch
+`BEHIND` and re-queues its required runs, so the heads below are the *post-update* SHAs and will move again until the
+queue drains: re-read with `gh pr view <n> --json headRefOid,mergeStateStatus` rather than trusting this row.
+
 | PR | Head | Latest-run-per-name status | Local evidence |
 |----|------|---------------------------|----------------|
-| #1179 publish guard | `3056b560` | 26 success / 3 in progress | `yamllint`, `shellcheck`, `bash -n`, `./scripts/validate-gate-contract.sh --ci-parity` PASS, `./scripts/test-release-workflow.sh --publish-fixtures` OK; sensor confirmed to bite `origin/main:197` |
-| #1177 readiness run ordering | `479eb16d` | 27 success / 1 in progress | latest-per-name reduction of the check-runs API reproduces the fix: #1179's two stale `Check for unreleased changes` **failures** are superseded by run `116964525934` = `success` |
-| #1175 guardrail docs | `7d8dac23` | 20 success / 6 pending | owns `AGENTS.md` + `agent_docs/LESSONS.md`; no code touched |
-| #1180 nightly Turso | `34774f4d` | 3 success / 14 pending | `--run-ignored only` → **86 passed / 0 failed** (default schema); `--features turso_multi_dimension --test multi_dimension_routing --test phase1_validation --run-ignored all` → **20 passed / 0 skipped**; `86 + 20 = 106` = pre-fix total; `cargo clippy -p do-memory-storage-turso --lib` clean in both feature configs; `yamllint`/`actionlint -shellcheck=` rc 0 |
-| plans closeout + `0.1.46` bump (this PR) | — | — | `./scripts/check-release-drift.sh` → `severity=clean reason=within_cadence`; `./scripts/validate-plans.sh` green (active-set, version-state, tracker-drift); `./scripts/check-docs-integrity.sh` green; `cargo update --workspace --offline` for the lockfile |
+| #1179 publish guard | `c36a874d` | re-queued on the new main (18 names, 1 green so far) | `yamllint`, `shellcheck`, `bash -n`, `./scripts/validate-gate-contract.sh --ci-parity` PASS, `./scripts/test-release-workflow.sh --publish-fixtures` OK; sensor confirmed to bite `origin/main:197` |
+| #1177 readiness run ordering | `826f5c7f` | re-queued on the new main (20 names) | latest-per-name reduction of the check-runs API reproduces the fix: #1179's two stale `Check for unreleased changes` **failures** are superseded by run `116964525934` = `success` |
+| #1175 guardrail docs | `7d8dac23` | 27 success / 1 skipped / 1 in progress (`Quality Gates`) | owns `AGENTS.md` + `agent_docs/LESSONS.md`; no code touched |
+| #1180 nightly Turso | `34774f4d` | 24 success / 5 in progress / 1 skipped / 1 neutral / **1 failure = `Check for unreleased changes`** | the only red is the drift gate, which clears when the `0.1.46` bump lands — nothing in the PR fails. `--run-ignored only` → **86 passed / 0 failed** (default schema); `--features turso_multi_dimension --test multi_dimension_routing --test phase1_validation --run-ignored all` → **20 passed / 0 skipped**; `86 + 20 = 106` = pre-fix total; `cargo clippy -p do-memory-storage-turso --lib` clean in both feature configs; `yamllint`/`actionlint -shellcheck=` rc 0 |
+| plans closeout + `0.1.46` bump (this PR) | `33953794` + main `791c01a3` | queued on the merged head | `./scripts/check-release-drift.sh` → `severity=clean reason=within_cadence`; `./scripts/validate-plans.sh` green (active-set, version-state `cargo=0.1.46 tag=0.1.45`, tracker-drift mismatches=0); `./scripts/check-docs-integrity.sh` green; `cargo update --workspace --offline` for the lockfile |
 
 ## Findings (2026-10-13…16)
 
