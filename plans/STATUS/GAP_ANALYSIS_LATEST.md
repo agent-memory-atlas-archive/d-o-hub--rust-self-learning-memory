@@ -24,6 +24,25 @@ In review: W5 #1075 #1138 · W6 #1085 #1140 · #1063 #1146 · #1064 #1147 · #10
 Waiting on merges: #1068/#1089 (after #1149), #1074 (in flight), #1076 (after #1074). Verdicts below remain the
 2026-10-04 audit snapshot; see `VALIDATION_LATEST.md` for the live state.
 
+## Live addendum (2026-10-16)
+
+`gh issue list --state open` = **5** — of the audited #1063–#1092 set only the three declared follow-ups remain
+(#1068 revision-aware merge, #1089 batch sync writes, #1076 pattern-embedding reuse); everything else in this
+register merged. The other two are release-series: #1109 (manual crates.io registrations — maintainer-external)
+and #1165 (v0.1.45 drift, closes with the `0.1.46` bump).
+
+New gaps found **after** the audit, i.e. not covered by any verdict below — tracked as ACT-399…ACT-408 in
+`ACTIONS.md` with evidence in `../GOAP_RELEASE_CLOSEOUT_2026-10-16.md` and `VALIDATION_LATEST.md`:
+
+| Gap | Evidence | Owner action |
+|-----|----------|--------------|
+| crates.io publish chain was **false-green** since `493cfb01`: two releases (`v0.1.44`, `v0.1.45`) never uploaded | newest published `0.1.34` (mcp `0.1.31`) while `release.yml` run `38883104363` = `success`; publish step `conclusion=skipped` | ACT-399 (#1179) + ACT-402 (first publishing tag `v0.1.46`) |
+| Turso monitoring metrics could never be stored (SQL named columns the DDL does not create; `avg_duration_ms` written in seconds) | nightly run `38883104337`: `106 tests run: 70 passed, 36 failed` | ACT-401 (#1180) + ACT-406 (schema-vs-SQL sensor) |
+| Multi-dimension embedding reads queried a table that feature build never creates | `no such table: embeddings` under `turso_multi_dimension` | ACT-401 (#1180) |
+| Pooled call sites used the direct-connection accessor | `get_connection() is only available in direct-connection mode` | ACT-401 (#1180), residual callers under #1064 follow-up |
+| Nightly test *configuration* could report a schema mismatch as a storage bug | `#[ignore]` + `--run-ignored only` ignores feature gating | ACT-403, ACT-407 |
+| 12 Dependabot alerts (8 low need `libsql 0.10.0`; `lru` blocked upstream by `augurs-changepoint` → `rv 0.16`) | `gh api repos/:owner/:repo/dependabot/alerts?state=open` | ACT-404 |
+
 ## Register — 22 open issues
 
 `Verdict` is the state at `74a44a15`. `Wave` is the queue position from `GOAP_AUDIT_BACKLOG_WAVE_2026-10-04.md`.
