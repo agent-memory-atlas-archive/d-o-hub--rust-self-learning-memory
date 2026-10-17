@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.46] - 2026-10-17
+
 ### Fixed
 
 - Turso monitoring metrics could never be written (#1180): `store_agent_metrics`
