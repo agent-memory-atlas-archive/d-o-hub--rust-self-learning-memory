@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   embedding a skip-ci marker in its own commit message, which had been
   suppressing the checks on the PRs it opened. ADR-045 amended accordingly.
 
+- The `release-guard` skill no longer claims that publishing a release fires
+  `release: published` and thereby runs `publish-crates.yml`. Verified at
+  `v0.1.46`: the publish run (39123847241) started 13s after the release went
+  live with `event=workflow_dispatch` on the tag SHA, because
+  `release.yml`'s `dispatch-publish` job dispatches it explicitly — a release
+  published with the repository `GITHUB_TOKEN` creates no `release`-event run
+  (LESSON-030). The skill now states the dispatch path and records that the
+  chain owns four crates (`do-memory-core`, `do-memory-storage-redb`,
+  `do-memory-storage-turso`, `do-memory-mcp`), all confirmed at `0.1.46` by
+  crates.io version membership over HTTP 200, while a `do-memory-cli` or
+  `do-memory-test-utils` 404 is by design. Looking for a `release`-event run
+  and finding none previously read as a failed publish.
+
 ### Tests
 
 - Issue #1089 acceptance criterion 3 is now evidenced (#1187):
