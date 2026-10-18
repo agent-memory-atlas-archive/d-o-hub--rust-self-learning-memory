@@ -15,8 +15,8 @@ changelog generator's duplicate-section defect (#1188), and follow-ups #1068 and
 
 | Kind | Items |
 |------|--------|
-| Open PRs | 2 open — #1188 (generator-produced changelog, **do not merge**: it duplicates the `## [0.1.46]` heading, see LESSON-066) and #1184 (redb/Turso revision merge); then the post-release `0.1.47` bump PR |
-| Open issues | 3 open (#1068, #1076, #1109) — #1089, #1165 and the `release-drift` #1182 closed when `v0.1.46` was tagged; #1089 criterion 4 is still unevidenced and must be re-tracked |
+| Open PRs | 4 open — #1189 (tag-selection fix + post-`v0.1.46` truth), #1190 (idempotent changelog generator, the replacement for #1188), #1188 (generator-produced changelog, **do not merge**: it duplicates the `## [0.1.46]` heading, see LESSON-066) and #1184 (redb/Turso revision merge, still red on the `conflict.rs` test-module layout). Next in order is the `0.1.47` bump PR, which is what clears `version_not_advanced` for all of them |
+| Open issues | 4 open (#1068, #1076, #1109, plus #1089 reopened on 2026-10-18 because criterion 4 — the sync ordering assertion — was never evidenced; criterion 3 is now proven by #1187 in `v0.1.46`). #1165 and the `release-drift` #1182 closed when `v0.1.46` was tagged |
 | Open Dependabot alerts | 12 (2 high, 2 medium, 8 low) = **6 advisories duplicated across `Cargo.lock` + `fuzz/Cargo.lock`**, all upstream-blocked (`rustls-webpki 0.102.8` via the libsql→rustls 0.22 chain, `lru <0.16.3` via `augurs-changepoint`/`agentfs-sdk`, unpatched `libsql-sqlite3-parser`). #1174 cleared `cargo audit`/`cargo deny`, **not** these — `libsql 0.10.0` would change none of them |
 
 ## Corrected claim (2026-10-04)
@@ -96,7 +96,7 @@ restated at each refresh. Read any campaign claim as campaign-scoped; the repo-w
 | Area | State |
 |------|--------|
 | First-party merge gate | ✅ **Live** — ruleset `9591004` requires `Codacy Static Code Analysis` + `CI / Required` (strict up-to-date policy); the aggregate is causally same-run and rejects `skipped`/`cancelled`/timed-out results |
-| Repo-wide open issues | 3 (the authoritative count + list is the **Open issues** row under *Open tracker (live)* — keep it in that one place; this row carried a stale copy of it). Note on **#1182**: the canonical `release-drift` issue, filed and updated **in place** by the `maintain-issue` job at `release-drift.yml:98-149` — it closed itself at 2026-10-18 11:14:15Z once `v0.1.46` was tagged, which is the designed exit (`version_not_advanced` clears when the tag matches), never by hand |
+| Repo-wide open issues | 4 (the authoritative count + list is the **Open issues** row under *Open tracker (live)* — keep it in that one place; this row carried a stale copy of it). Note on **#1182**: the canonical `release-drift` issue, filed and updated **in place** by the `maintain-issue` job at `release-drift.yml:98-149` — it closed itself at 2026-10-18 11:14:15Z once `v0.1.46` was tagged, which is the designed exit (`version_not_advanced` clears when the tag matches), never by hand |
 | Merged since 2026-10-06 | #1130, #1142, #1143, #1148, #1138, #1140, #1144, #1145, #1146, #1147, #1149, #1150, #1151, #1152, #1154, #1158, #1159, #1160, #1161, #1153, #1174, #1172, #1173, #1175, #1176, #1177, #1179, #1180, #1181, #1185, #1186, #1187 |
 | Production pattern query relevance | ✅ **#1074 merged in #1160** — pattern operations use one runtime provider snapshot |
 | `episodes.created_at` watermark | ✅ **#1067 merged in #1149** — durable modification watermark and bounded keyset pages |
