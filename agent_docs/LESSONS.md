@@ -1232,8 +1232,9 @@ Compact log for non-obvious workflow learnings. Pair each entry here with a shor
   PR's green CI —
   `gh api repos/{o}/{r}/contents/CHANGELOG.md?ref=<head> --jq .content |
   base64 -d | grep -E '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | uniq -c`. CI does not
-  run the duplicate gate on a PR that only touches CHANGELOG.md, so green here
-  means nothing.
+  run the duplicate gate on a PR that only touches CHANGELOG.md — but in #1188
+  nothing ran at all: its eight workflow runs are `action_required` (LESSON-067),
+  which is why the rollup looked quietly green instead of failing.
 - Fix/prevention: the generator must treat "section for this tag already exists"
   as replace-or-skip, and the generator job itself should fail on a duplicate
   heading before it opens the PR.
@@ -1249,3 +1250,50 @@ Compact log for non-obvious workflow learnings. Pair each entry here with a shor
 - References: PR #1188, PR #1186, issue #1178, issue #1089, LESSON-057
   (the bump is the drift exit), `.agents/skills/release-guard/SKILL.md`
   (empty-notes failure mode).
+
+## LESSON-067: a bot-committer PR never runs CI, so its required check can never report (2026-10-18)
+
+- Issue: PR #1188 (opened by `peter-evans/create-pull-request` from the
+  `Generate Changelog` workflow) looked healthy: zero failing rows in
+  `statusCheckRollup`, and the only entries present were CodeQL and Codacy, all
+  `SUCCESS`. In fact none of the eight repository workflows ever executed:
+
+  ```
+  $ gh run list --branch chore/update-changelog-v0.1.46 --json name,conclusion
+  CI, Release Drift Check, Coverage, Security, Supply Chain Security,
+  Storage Matrix Tests, Skill Evals, File Structure Validation
+      -> every one conclusion=action_required
+  $ gh api repos/{owner}/{repo}/actions/runs/39122545647 \
+        --jq '.conclusion, .triggering_actor.login, .head_commit.committer.name'
+  action_required  github-actions[bot]  github-actions[bot]
+  $ gh api repos/{owner}/{repo}/actions/runs/39122545647/jobs --jq .total_count
+  0
+  ```
+
+- Why it matters: GitHub withholds workflow execution for runs whose commit and
+  trigger identity it does not trust — here both are `github-actions[bot]` —
+  until a maintainer approves them. So `CI / Required` is not pending and not
+  failing, it is **absent**, while the services GitHub pushes itself (CodeQL,
+  Codacy) report regardless. `mergeStateStatus` then sits at `BLOCKED` with
+  `pending: 0`, which reads as "still waiting on CI" and actually means "CI is
+  never coming". That is the second, independent reason generated changelog PRs
+  cannot land: #1178's equivalent was closed rather than merged in the same
+  shape, on top of its content defect (LESSON-066).
+- Detection: never treat an empty failing-row list as green. Count the rows
+  against the workflows a PR must trigger, then confirm the runs —
+  `gh run list --branch <head-branch> --json name,status,conclusion` and
+  `gh api repos/{owner}/{repo}/actions/runs/<id> --jq .conclusion`.
+  `action_required` together with `jobs.total_count == 0` means unapproved, not
+  passed. A rollup whose expected rows are silently missing is the same failure
+  class as an empty report file: assert the artifact exists before believing it.
+- Fix/prevention: prefer designs where the bot does not need a mergeable PR at
+  all — #1190 makes the generator skip a version the release-preparation PR
+  already wrote, so the normal case opens nothing. When a generated change
+  really is required, re-author the commit under a human identity
+  (`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` plus a user token) or have a
+  maintainer approve the runs **after reading the diff**; never blanket-approve
+  a bot's workflows just to make a rollup report.
+- References: PR #1188 (CI run `39122545647`), PR #1178's closed auto-PR,
+  LESSON-065 (the other way a rollup lies), LESSON-066 (the content defect in
+  the same PR), `.agents/skills/pr-readiness/SKILL.md` (green rows are not a
+  merge signal).
