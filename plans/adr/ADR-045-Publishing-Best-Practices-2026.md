@@ -1782,6 +1782,14 @@ has duplicate headings, an empty target section, or cannot be rendered by `parse
 #1188 shape. Adopting `cargo-release` requires deleting one of those two writers; the script's skip guard now absorbs
 the hook half of it.
 
-**Still open**: the diff-based immutability sensor for already-published sections, and a PR-time job that runs the
-heading-uniqueness check (today it runs only at ship time via `verify-release-state.sh`, which is how #1188's CI
-stayed green).
+**Correction (measured 2026-10-18)**: #1188's checks were never green — they never ran. All eight workflows on that
+branch sit at `conclusion=action_required` with `jobs.total_count=0` (CI run `39122545647`), because the commit is
+authored by `github-actions[bot]` (`triggering_actor=github-actions[bot]`) and GitHub withholds workflow execution until a
+maintainer approves bot-triggered runs. So `CI / Required` cannot report and `mergeStateStatus` is pinned `BLOCKED`:
+an auto-generated changelog PR is unmergeable by construction unless a human approves eight workflow runs first. That is
+also why #1178's equivalent PR was closed rather than merged. The skip guard above removes the normal case for such a PR
+(the release-preparation PR already owns the section); if a release ever ships without a curated section, the fallback is
+to re-author the generated commit under a human identity, not to approve bot runs blindly.
+The missing *PR-time* heading-uniqueness job is still worth building for human-authored changelog edits — today the check
+runs only at ship time via `verify-release-state.sh` — but it is not what let #1188 through.
+**Also still open**: the diff-based immutability sensor for already-published sections.
