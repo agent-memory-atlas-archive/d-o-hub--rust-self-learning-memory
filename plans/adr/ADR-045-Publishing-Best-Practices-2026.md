@@ -1765,3 +1765,23 @@ generator upgrade silently re-renders every release — crates.io shows `2.14.0`
 **Not covered by this amendment**: a guard that *detects* published-section rewrites (a diff-based immutability
 sensor) is still unbuilt; and `[skip ci]` in the generator's commit message leaves the resulting PR with an empty
 required-check rollup, which is why those PRs could not be merged even when their content was right.
+
+## Amendment (2026-10-18): the generator must be idempotent, not just range-correct (#1188)
+
+Bound the range (#1186) and the duplicate still happened, because `--prepend` writes unconditionally while the
+release-preparation PR owns the curated `## [X.Y.Z]` heading. One tag-push run was enough: `v0.1.46`'s section
+existed on `main` dated 2026-10-17, and the tag push prepended a second one dated 2026-10-18.
+
+**Amended prescription**: `changelog.yml` and any release hook call `./scripts/update-changelog.sh --tag "$CLIFF_TAG"`.
+That script skips a version that already has a section, refuses to succeed without `git-cliff`, and fails when the file
+has duplicate headings, an empty target section, or cannot be rendered by `parse-changelog`. The raw
+`git-cliff --latest --tag ... --prepend CHANGELOG.md` line above is superseded by that call.
+
+**Hazard in the original config block**: pairing `pre-release-hook = ["./scripts/update-changelog.sh"]` with
+`[[package.pre-release-replacements]]` that inserts `## [{{version}}]` writes the same version heading twice — the
+#1188 shape. Adopting `cargo-release` requires deleting one of those two writers; the script's skip guard now absorbs
+the hook half of it.
+
+**Still open**: the diff-based immutability sensor for already-published sections, and a PR-time job that runs the
+heading-uniqueness check (today it runs only at ship time via `verify-release-state.sh`, which is how #1188's CI
+stayed green).
