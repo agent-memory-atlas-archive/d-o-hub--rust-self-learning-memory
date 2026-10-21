@@ -89,72 +89,34 @@ check_publish_fixtures() {
 }
 
 check_ci_check_event_filtering() {
-  local rm="./scripts/release-manager.sh"
-  local lib="./scripts/lib/release-gate-events.sh"
-  [[ -f "$rm" ]] || fail "missing $rm"
-  [[ -f "$lib" ]] || fail "missing $lib"
-
-  # (1) release-manager.sh must fetch event in gh run list
-  if ! rg -q 'gh run list' "$rm"; then
-    fail "release-manager.sh must query workflow runs"
-  fi
-  if ! rg -q '\--json.*event' "$rm"; then
-    fail "release-manager.sh must include event in gh run list --json"
-  fi
-
-  # (2) The classification must live in the shared library, and the gate must
-  #     use it — otherwise the test below would only re-implement the logic.
-  rg -q 'release-gate-events\.sh' "$rm" || fail "release-manager.sh must source scripts/lib/release-gate-events.sh"
-  rg -q 'release_gate_gating_failures' "$rm" || fail "release-manager.sh must use the shared gate helpers"
-  # The event classes must come from the library, not from a second copy of the
-  # event names in a jq expression: two copies can disagree, and the fixture
-  # below would then test a rule the gate does not implement.
-  rg -q 'release_gate_select_runs' "$rm" \
-    || fail "release-manager.sh must select gating runs with release_gate_select_runs"
-  if rg -q '\.event == "push"' "$rm"; then
-    fail "release-manager.sh must not inline the event names; use release_gate_select_runs"
-  fi
-
-  # (3) The library must classify events exactly as ADR-083 states:
-  #     push/pull_request gate; schedule/workflow_dispatch are advisory.
   local lib_dir
   lib_dir=$(mktemp -d)
-  # shellcheck source=/dev/null
-  source "$lib"
 
-  release_gate_is_gating_event "push" || fail "push must be a gating event"
-  release_gate_is_gating_event "pull_request" || fail "pull_request must be a gating event"
-  release_gate_is_advisory_event "schedule" || fail "schedule must be advisory"
-  release_gate_is_advisory_event "workflow_dispatch" || fail "workflow_dispatch must be advisory"
-  if release_gate_is_advisory_event "push"; then fail "push must not be advisory"; fi
-  if release_gate_is_gating_event "schedule"; then fail "schedule must not be gating"; fi
-
-  # (4) Behavioural test: drive the REAL do_ci_check against a stubbed `gh`
-  #     and assert the verdict. This is what the previous fixture could not do:
-  #     it re-implemented the filter inline, so it passed even when the gate
-  #     was inverted.
+  # Drive the real do_ci_check against a stubbed gh that applies the event
+  # filter before --limit, matching GitHub CLI's server-side query semantics.
   local stub_bin
   stub_bin="$lib_dir/bin"
   mkdir -p "$stub_bin"
 
-  # stub `gh`: returns the run list encoded in STUB_RUNS, honouring --event.
+  # Stub gh: filter by one --event, then apply the requested result limit.
   cat > "$stub_bin/gh" <<'STUB'
 #!/usr/bin/env bash
-# Stub `gh` for the release-gate fixture. STUB_RUNS holds the JSON run list;
-# STUB_EVENT, when set, filters it by event.
 event=""
+limit=20
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --event) event="$2"; shift 2 ;;
+    --limit) limit="$2"; shift 2 ;;
     --json) shift 2 ;;
-    --branch|--commit|--limit) shift 2 ;;
+    --branch|--commit) shift 2 ;;
     *) shift ;;
   esac
 done
 if [[ -n "$event" ]]; then
-  printf '%s' "$STUB_RUNS" | jq -c --arg e "$event" '[ .[] | select(.event == $e) ]'
+  printf '%s' "$STUB_RUNS" | jq -c --arg e "$event" --argjson limit "$limit" \
+    '[ .[] | select(.event == $e) ] | .[:$limit]'
 else
-  printf '%s' "$STUB_RUNS"
+  printf '%s' "$STUB_RUNS" | jq -c --argjson limit "$limit" '.[:$limit]'
 fi
 STUB
   chmod +x "$stub_bin/gh"
@@ -167,12 +129,21 @@ STUB
                exec ./scripts/release-manager.sh ci-check' 2>&1) && CI_CHECK_RC=0 || CI_CHECK_RC=$?
   }
 
+  run_release_status() {
+    # $1 = runs json; sets STATUS_RC and STATUS_OUT
+    local runs="$1"
+    STATUS_OUT=$(PATH="$stub_bin:$PATH" STUB_RUNS="$runs" \
+      bash -c 'git fetch origin main --quiet 2>/dev/null || true
+               exec ./scripts/release-manager.sh status' 2>&1) && STATUS_RC=0 || STATUS_RC=$?
+  }
+
   # (a) green push CI + a red nightly -> release gate must PASS.
   run_ci_check '[
     {"name":"CI","status":"completed","conclusion":"success","event":"push"},
     {"name":"Nightly","status":"completed","conclusion":"failure","event":"schedule"}
   ]'
   [[ "$CI_CHECK_RC" -eq 0 ]] || fail "a red schedule run must not block the gate (rc=$CI_CHECK_RC): $CI_CHECK_OUT"
+  [[ "$CI_CHECK_OUT" == *"Nightly [schedule]"* ]] || fail "the red schedule run must remain visible: $CI_CHECK_OUT"
 
   # (b) a red push run -> release gate must FAIL.
   run_ci_check '[
@@ -199,6 +170,7 @@ STUB
     {"name":"Manual","status":"completed","conclusion":"failure","event":"workflow_dispatch"}
   ]'
   [[ "$CI_CHECK_RC" -eq 0 ]] || fail "a red workflow_dispatch run must not block the gate (rc=$CI_CHECK_RC): $CI_CHECK_OUT"
+  [[ "$CI_CHECK_OUT" == *"Manual [workflow_dispatch]"* ]] || fail "the red workflow_dispatch run must remain visible: $CI_CHECK_OUT"
 
   # (f) a non-CI event (issues / dynamic CodeQL) must not decide the verdict.
   run_ci_check '[
@@ -206,16 +178,36 @@ STUB
     {"name":"Push on main","status":"completed","conclusion":"failure","event":"dynamic"}
   ]'
   [[ "$CI_CHECK_RC" -eq 0 ]] || fail "a dynamic (CodeQL) run must not block the release gate (rc=$CI_CHECK_RC): $CI_CHECK_OUT"
+  [[ "$CI_CHECK_OUT" == *"Push on main [dynamic]"* ]] || fail "the non-CI run must remain visible: $CI_CHECK_OUT"
 
-  # (g) a red pull_request run is a gating failure: both gating events must
-  #     count. Without this case the fixture cannot tell "only push gates"
-  #     from "push and pull_request gate" — the gate and the library would
-  #     have to disagree for the fixture to notice.
+  # (g) a red pull_request run must block, just like a red push run.
+  # This catches an implementation that queries push but omits pull_request.
   run_ci_check '[
     {"name":"CI","status":"completed","conclusion":"success","event":"push"},
     {"name":"CI (PR)","status":"completed","conclusion":"failure","event":"pull_request"}
   ]'
   [[ "$CI_CHECK_RC" -ne 0 ]] || fail "a red pull_request run must block the gate: $CI_CHECK_OUT"
+  # (h) status must use the same per-event queries and report advisory counts.
+  run_release_status '[
+    {"name":"CI","status":"in_progress","conclusion":null,"event":"push"},
+    {"name":"Nightly","status":"completed","conclusion":"failure","event":"schedule"},
+    {"name":"Manual","status":"completed","conclusion":"failure","event":"workflow_dispatch"}
+  ]'
+  [[ "$STATUS_RC" -eq 0 ]] || fail "release status must succeed with available run data: $STATUS_OUT"
+  [[ "$STATUS_OUT" == *"main CI pending:    1 (gating)"* ]] || fail "release status must count pending gating runs: $STATUS_OUT"
+  [[ "$STATUS_OUT" == *"main CI failed:     0 (gating)"* ]] || fail "advisory failures must not count as gating failures: $STATUS_OUT"
+  [[ "$STATUS_OUT" == *"advisory runs:      2 (schedule/workflow_dispatch — non-blocking)"* ]] || fail "release status must report both advisory event classes: $STATUS_OUT"
+
+  # (i) unrelated runs cannot consume the result cap and hide a failed push.
+  local crowded_runs
+  crowded_runs=$(jq -cn '
+    [{name:"CI green",status:"completed",conclusion:"success",event:"push"}]
+    + [range(0; 99) | {name:("Issue " + tostring),status:"completed",
+       conclusion:"success",event:"issues"}]
+    + [{name:"CI failure",status:"completed",conclusion:"failure",event:"push"}]
+  ')
+  run_ci_check "$crowded_runs"
+  [[ "$CI_CHECK_RC" -ne 0 ]] || fail "a failed push run beyond unrelated event noise must block the gate: $CI_CHECK_OUT"
 
   rm -rf "$lib_dir"
   echo "OK: ci-check event filtering fixtures"

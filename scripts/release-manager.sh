@@ -102,6 +102,36 @@ cd "$PROJECT_ROOT"
 # shellcheck source=scripts/lib/release-gate-events.sh
 source "$PROJECT_ROOT/scripts/lib/release-gate-events.sh"
 
+# Query every event separately so runs of unrelated event types cannot consume
+# an event's result limit. The event names come from the shared classification.
+query_release_gate_runs() {
+  local class="$1" head="$2" event event_runs runs_json='[]'
+  local -a events=()
+  case "$class" in
+    gating) events=("${RELEASE_GATE_GATING_EVENTS[@]}") ;;
+    advisory) events=("${RELEASE_GATE_ADVISORY_EVENTS[@]}") ;;
+    *) echo "query_release_gate_runs: unknown class '$class'" >&2; return 2 ;;
+  esac
+
+  for event in "${events[@]}"; do
+    if ! event_runs=$(gh run list --branch main --commit "$head" --limit 100 \
+      --event "$event" --json status,conclusion,name,event 2>/dev/null); then
+      echo "Failed to query $event workflow runs for $head" >&2
+      return 1
+    fi
+    if ! jq -e 'type == "array"' >/dev/null <<<"$event_runs"; then
+      echo "Invalid response querying $event workflow runs for $head" >&2
+      return 1
+    fi
+    if ! runs_json=$(jq -cn --argjson accumulated "$runs_json" \
+      --argjson current "$event_runs" '$accumulated + $current'); then
+      return 1
+    fi
+  done
+  printf '%s\n' "$runs_json"
+}
+
+
 run_cmd() {
   local cmd="$1"
   if [[ "$DRY_RUN" == "true" ]]; then
@@ -157,24 +187,28 @@ do_ci_check() {
   head=$(git rev-parse origin/main)
   echo "  origin/main: $(git rev-parse --short "$head")"
 
-  # Query gating and advisory runs separately, server-side: filtering after a
-  # single --limit would let advisory noise consume the limit and silently
-  # drop the real CI run (a fail-open gate).
-  local runs_json advisory_runs_json
-  runs_json=$(gh run list --branch main --commit "$head" --limit 100 \
+  # Query each gating/advisory event separately before the per-event --limit.
+  # The unfiltered query below is for non-gating visibility only.
+  local gate_runs_json advisory_runs_json all_runs_json
+  if ! gate_runs_json=$(query_release_gate_runs gating "$head"); then
+    echo "  ❌ Unable to query all gating workflow runs on HEAD" >&2
+    exit 1
+  fi
+  if ! advisory_runs_json=$(query_release_gate_runs advisory "$head"); then
+    echo "  ⚠️  Unable to query advisory workflow runs; status is incomplete" >&2
+    advisory_runs_json='[]'
+  fi
+  all_runs_json=$(gh run list --branch main --commit "$head" --limit 100 \
     --json status,conclusion,name,event 2>/dev/null || echo '[]')
-  advisory_runs_json=$(gh run list --branch main --commit "$head" --limit 100 \
-    --json status,conclusion,name,event --event schedule --event workflow_dispatch \
-    2>/dev/null || echo '[]')
 
   # ADR-083: only push/pull_request runs are evidence about this commit's CI.
   # Runs triggered by other events (issues, dynamic/CodeQL, …) are listed for
   # visibility but never decide the verdict. The class membership comes from
   # the shared library, so the gate's filter cannot drift from the rule.
   local gate_json advisory_json other_json total pending failed advisory_count
-  gate_json=$(release_gate_select_runs "$runs_json" gating)
+  gate_json=$(release_gate_select_runs "$gate_runs_json" gating)
   advisory_json=$(release_gate_select_runs "$advisory_runs_json" advisory)
-  other_json=$(release_gate_other_runs "$runs_json")
+  other_json=$(release_gate_other_runs "$all_runs_json")
 
   total=$(release_gate_gating_total "$gate_json")
   pending=$(release_gate_gating_pending "$gate_json")
@@ -233,19 +267,24 @@ do_status() {
     echo "  worktree:           clean"
   fi
   if command -v gh >/dev/null 2>&1 && git rev-parse origin/main >/dev/null 2>&1; then
-    local head runs_json gate_json pending failed advisory_count
+    local head gate_runs_json advisory_runs_json gate_json pending failed advisory_count
     head=$(git rev-parse origin/main)
-    runs_json=$(gh run list --branch main --commit "$head" --limit 100 \
-      --json status,conclusion,name,event 2>/dev/null || echo '[]')
-    gate_json=$(release_gate_select_runs "$runs_json" gating)
-    pending=$(release_gate_gating_pending "$gate_json")
-    failed=$(release_gate_gating_failures "$gate_json")
-    advisory_count=$(release_gate_gating_total \
-      "$(release_gate_select_runs "$runs_json" advisory)")
-    echo "  main CI pending:    $pending (gating)"
-    echo "  main CI failed:     $failed (gating)"
-    # ADR-083: advisory runs stay visible so nothing is hidden by the filter.
-    echo "  advisory runs:      $advisory_count (schedule/workflow_dispatch — non-blocking)"
+    if gate_runs_json=$(query_release_gate_runs gating "$head"); then
+      gate_json=$(release_gate_select_runs "$gate_runs_json" gating)
+      pending=$(release_gate_gating_pending "$gate_json")
+      failed=$(release_gate_gating_failures "$gate_json")
+      echo "  main CI pending:    $pending (gating)"
+      echo "  main CI failed:     $failed (gating)"
+    else
+      echo "  main CI status:     unavailable (gating query failed)"
+    fi
+    if advisory_runs_json=$(query_release_gate_runs advisory "$head"); then
+      advisory_count=$(release_gate_gating_total \
+        "$(release_gate_select_runs "$advisory_runs_json" advisory)")
+      echo "  advisory runs:      $advisory_count (schedule/workflow_dispatch — non-blocking)"
+    else
+      echo "  advisory runs:      unavailable (query failed; non-blocking)"
+    fi
   fi
   echo ""
   echo "Ship when version docs match and main CI is green:"
