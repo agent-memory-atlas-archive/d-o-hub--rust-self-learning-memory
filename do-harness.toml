@@ -9,7 +9,7 @@ language = "rust"
 pre-commit = ["fmt", "loc"]
 pre-push = []
 
-[sets]
+[signal-sets]
 feedback = ["fmt", "loc", "check"]
 verification = [
   "fmt",
@@ -70,7 +70,7 @@ argv = ["bash", "scripts/check-doctests.sh"]
 
 [[sensors]]
 name = "deny"
-argv = ["cargo", "deny", "check"]
+argv = ["bash", "scripts/check-dependency-audit.sh"]
 
 [[sensors]]
 name = "loc"
