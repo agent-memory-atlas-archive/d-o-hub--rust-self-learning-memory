@@ -6,9 +6,8 @@
 # - Identification of exact audited lockfiles
 # - Failure on missing lockfile
 # - Failure on empty lockfile
-# - Failure on invalid JSON report
+# - Failure on nonzero cargo audit exit with valid JSON report
 # - Failure on seeded unignored vulnerability finding in fuzz lockfile
-# - Verification of lockfile immutability
 
 set -euo pipefail
 
@@ -138,5 +137,39 @@ if ! echo "$OUT4" | grep -q "fuzz/Cargo.lock"; then
     exit 1
 fi
 echo "PASSED Test 4"
+
+# Test 5: Failure when cargo audit emits valid JSON but exits nonzero
+echo "Test 5: Failure on nonzero cargo audit exit..."
+make_fixture_repo "$TEST_TMPDIR/repo_audit_error"
+FAKE_BIN="$TEST_TMPDIR/fake_bin"
+mkdir -p "$FAKE_BIN"
+cat << 'EOF' > "$FAKE_BIN/cargo"
+#!/bin/bash
+if [[ "${1:-}" == "deny" ]]; then
+    exit 0
+fi
+if [[ "${1:-}" == "audit" && "${2:-}" == "--version" ]]; then
+    exit 0
+fi
+if [[ "${1:-}" == "audit" ]]; then
+    printf '%s\n' '{"vulnerabilities":{"count":0,"list":[]}}'
+    exit 1
+fi
+exit 2
+EOF
+chmod +x "$FAKE_BIN/cargo"
+set +e
+OUT5=$(cd "$TEST_TMPDIR/repo_audit_error" && PATH="$FAKE_BIN:$PATH" ./scripts/check-dependency-audit.sh 2>&1)
+RC5=$?
+set -e
+if [ "$RC5" -eq 0 ]; then
+    echo "FAILED Test 5: Script passed despite cargo audit exiting nonzero." >&2
+    exit 1
+fi
+if ! echo "$OUT5" | grep -q "cargo audit failed"; then
+    echo "FAILED Test 5: Expected cargo audit exit failure, got: $OUT5" >&2
+    exit 1
+fi
+echo "PASSED Test 5"
 
 echo "=== All dependency audit tests passed successfully ==="

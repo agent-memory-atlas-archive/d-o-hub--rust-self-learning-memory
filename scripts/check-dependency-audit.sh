@@ -98,6 +98,13 @@ run_audit_for_lockfile() {
         return 1
     fi
 
+    if [ "$audit_rc" -ne 0 ]; then
+        echo "ERROR: cargo audit failed for '$lockfile' with exit code $audit_rc." >&2
+        if [ -f "${report_file}.err" ]; then
+            cat "${report_file}.err" >&2
+        fi
+        return 1
+    fi
     return 0
 }
 
