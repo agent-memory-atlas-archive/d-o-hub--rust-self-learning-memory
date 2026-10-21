@@ -109,6 +109,8 @@ mcp-config-*.json
 *.proptest-regressions
 .memory-traces/
 audit-report.json
+audit-report-*.json
+audit-report-*.json.err
 insights-report/
 benchmark_results/
 # Root-level artifact dir only — must NOT swallow source modules like

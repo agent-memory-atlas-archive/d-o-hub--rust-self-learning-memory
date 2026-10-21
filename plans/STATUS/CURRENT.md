@@ -9,15 +9,15 @@ false-green crates.io publish (#1179) is fixed and verified externally at `v0.1.
 the readiness-gate run ordering (#1177) and guardrail docs (#1175) are merged, and the `0.1.46` bump shipped.
 What remains: the `0.1.47` release-prep PR (CHANGELOG heading + version-doc flip), the crates.io registrations
 for `do-memory-cli`/`do-memory-examples`, and the upstream-blocked Dependabot register.
-**Branch**: `main` @ `7411a336`
+**Branch**: `main` @ `18b1ab8f`
 
 ## Open tracker (live)
 
 | Kind | Items |
 |------|--------|
-| Open PRs | 2 open — #1204 (release-gate CI event filtering, ADR-083) and #1207 (audit the excluded `fuzz/Cargo.lock` as a separate dependency graph, issue #1206). #1194 (LESSON-068…076) merged 2026-10-20 as `24a90054`; the rest of the queue merged earlier (#1189, #1190, #1192, #1193, #1197, #1198, #1201, #1203). `gh pr list --state open` is the live source |
-| Open issues | 4 open — #1206 (audit the excluded `fuzz/Cargo.lock` as a separate dependency graph), #1205 (the auto-filed `release-drift` issue: 20 commits / 2 days since `v0.1.46` — it closes itself when the version advances), #1200 (the release-gate event-filtering issue that #1204 closes) and #1109 (the release-pipeline best-practice work, code-complete with the manual crates.io registrations outstanding). #1068, #1076 and #1089 closed on 2026-10-19/20; #1182 and #1165 closed when `v0.1.46` was tagged |
-| Open Dependabot alerts | 12 (2 high, 2 medium, 8 low) = **6 advisories duplicated across `Cargo.lock` + `fuzz/Cargo.lock`**, all upstream-blocked (`rustls-webpki 0.102.8` via the libsql→rustls 0.22 chain, `lru <0.16.3` via `augurs-changepoint`/`agentfs-sdk`, unpatched `libsql-sqlite3-parser`). #1174 cleared `cargo audit`/`cargo deny`, **not** these — `libsql 0.10.0` would change none of them |
+| Open PRs | 0 open — the queue is merged. #1207 merged 2026-10-21 as `18b1ab8f`, #1204 as `9497dd2c`, #1194 (LESSON-068…076) as `24a90054`; the rest merged earlier (#1189, #1190, #1192, #1193, #1197, #1198, #1201, #1203). `gh pr list --state open` is the live source |
+| Open issues | 3 open — #1208 (audit the excluded `fuzz/Cargo.lock` as a separate dependency graph; #1206 closed with a PR whose merged commit did not carry the work, so this re-files it), #1205 (the auto-filed `release-drift` issue: 32 commits / 3 days since `v0.1.46` — it closes itself when the version advances) and #1109 (the release-pipeline best-practice work, code-complete with the manual crates.io registrations outstanding). #1200 closed with #1204; #1068, #1076 and #1089 closed on 2026-10-19/20; #1182 and #1165 closed when `v0.1.46` was tagged |
+| Open Dependabot alerts | 12 (2 high, 2 medium, 8 low) = **6 advisories duplicated across `Cargo.lock` + `fuzz/Cargo.lock`**, all upstream-blocked (`rustls-webpki 0.102.8` via the libsql→rustls 0.22 chain, `lru <0.16.3` via `augurs-changepoint`/`agentfs-sdk`, unpatched `libsql-sqlite3-parser`). The **root** graph is now clean: `cargo deny` → `advisories ok` and `cargo audit` → 0 vulnerabilities (measured 2026-10-21, after the RUSTSEC-2026-0381/0382/0383 bumps in #1204). The **fuzz** graph still fails (`cargo deny --manifest-path fuzz/Cargo.toml check advisories` → FAILED) and no gate reads it — that is #1208 |
 
 ## Corrected claim (2026-10-04)
 

@@ -11,10 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `webpki-roots` 1.0.7 → 1.0.10 (RUSTSEC-2026-0381), `rustls-webpki` 0.103.15 →
   0.103.16 (RUSTSEC-2026-0382) and `webpki-root-certs` 1.0.7 → 1.0.10
-  (RUSTSEC-2026-0383). `cargo audit` reports 1 vulnerability instead of 3; the
-  remaining one is `rustls-webpki` 0.102.8, reached transitively through
-  `libsql → hyper-rustls 0.25 → rustls 0.22` and blocked on libsql moving to
-  hyper 1.x, so it stays on the existing upstream-blocked register.
+  (RUSTSEC-2026-0383). On the **root** dependency graph `cargo audit` reports 0
+  vulnerabilities instead of 4, and `cargo deny check advisories` goes from
+  FAILED to `advisories ok` (measured against a fresh advisory database, not
+  the stale local clone). The one advisory that cannot be fixed directly is
+  `rustls-webpki` 0.102.8, reached transitively through
+  `libsql → hyper-rustls 0.25 → rustls 0.22`; rustls 0.22 pins webpki to the
+  0.102 series, so the fix needs libsql on a hyper 1.x line. It is waived in
+  both `deny.toml` and `.cargo/audit.toml` — the two tools read different
+  advisory databases, so a waiver in only one leaves the other gate red.
+
+  The `fuzz` dependency graph is still excluded from every gate
+  (`Cargo.toml:14` `exclude = ["fuzz"]`) and still fails
+  `cargo deny --manifest-path fuzz/Cargo.toml check advisories`; auditing it
+  separately is #1208.
 
 ### CI/CD
 
