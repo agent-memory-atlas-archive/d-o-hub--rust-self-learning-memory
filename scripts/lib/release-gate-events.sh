@@ -26,24 +26,6 @@ RELEASE_GATE_ADVISORY_EVENTS=("schedule" "workflow_dispatch")
 # Events whose runs are evidence about the commit's own CI.
 RELEASE_GATE_GATING_EVENTS=("push" "pull_request")
 
-# release_gate_is_advisory_event EVENT -> 0 when advisory, 1 otherwise.
-release_gate_is_advisory_event() {
-  local event="$1" candidate
-  for candidate in "${RELEASE_GATE_ADVISORY_EVENTS[@]}"; do
-    [[ "$event" == "$candidate" ]] && return 0
-  done
-  return 1
-}
-
-# release_gate_is_gating_event EVENT -> 0 when gating, 1 otherwise.
-release_gate_is_gating_event() {
-  local event="$1" candidate
-  for candidate in "${RELEASE_GATE_GATING_EVENTS[@]}"; do
-    [[ "$event" == "$candidate" ]] && return 0
-  done
-  return 1
-}
-
 # release_gate_gating_failures GATING_JSON -> count of completed gating runs
 # that are not success/skipped/neutral.
 release_gate_gating_failures() {

@@ -11,10 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `webpki-roots` 1.0.7 → 1.0.10 (RUSTSEC-2026-0381), `rustls-webpki` 0.103.15 →
   0.103.16 (RUSTSEC-2026-0382) and `webpki-root-certs` 1.0.7 → 1.0.10
-  (RUSTSEC-2026-0383). `cargo audit` reports 1 vulnerability instead of 3; the
-  remaining one is `rustls-webpki` 0.102.8, reached transitively through
-  `libsql → hyper-rustls 0.25 → rustls 0.22` and blocked on libsql moving to
-  hyper 1.x, so it stays on the existing upstream-blocked register.
+  (RUSTSEC-2026-0383). On the **root** dependency graph `cargo audit` reports 0
+  vulnerabilities instead of 4, and `cargo deny check advisories` goes from
+  FAILED to `advisories ok` (measured against a fresh advisory database, not
+  the stale local clone). The one advisory that cannot be fixed directly is
+  `rustls-webpki` 0.102.8, reached transitively through
+  `libsql → hyper-rustls 0.25 → rustls 0.22`; rustls 0.22 pins webpki to the
+  0.102 series, so the fix needs libsql on a hyper 1.x line. It is waived in
+  both `deny.toml` and `.cargo/audit.toml` — the two tools read different
+  advisory databases, so a waiver in only one leaves the other gate red.
+
+  The `fuzz` dependency graph is still excluded from every gate
+  (`Cargo.toml:14` `exclude = ["fuzz"]`) and still fails
+  `cargo deny --manifest-path fuzz/Cargo.toml check advisories`; auditing it
+  separately is #1208.
 
 ### CI/CD
 
@@ -28,14 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   classification is an allowlist (a newly-introduced event type does not
   silently become gating) and lives in `scripts/lib/release-gate-events.sh`,
   which `scripts/test-release-workflow.sh` exercises through the real
-  `do_ci_check` against a stubbed `gh`: a red scheduled run must not block, and
-  a red or pending push run must. Gating and advisory runs are queried
-  separately, server-side, so advisory noise cannot consume the result limit
-  and hide the real `CI` run. A tag-triggered nightly is a `push` event and
-  still gates a release. The event names are written down once, in the
-  library's arrays: an inline copy in `release-manager.sh` is a second source
-  of truth, and no fixture can catch the two disagreeing — measured, dropping
-  `pull_request` from such a copy left every fixture green.
+  `do_ci_check`: red schedule and `workflow_dispatch` runs must not block, red
+  or pending push and `pull_request` runs must, and a failed push beyond
+  unrelated issue-event noise must still block. Each event is queried
+  separately with `--event` before its 100-run limit; the unfiltered result list
+  is used only to report other event types. A tag-triggered nightly remains a
+  `push` event and still gates a release. The event names live once in the
+  library arrays and feed both the per-event queries and local selection.
 
 - The release changelog generator no longer rewrites published history
   (#1186). Every `chore/update-changelog` PR from v0.1.41 to v0.1.45 had to be

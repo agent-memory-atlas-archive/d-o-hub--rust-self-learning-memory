@@ -769,18 +769,17 @@ Compact log for non-obvious workflow learnings. Pair each entry here with a shor
   explicit decision first; do not silently exclude schedule runs.
 - Resolution (2026-10-20, ADR-083, PR #1204): the explicit decision is now made —
   `schedule` and `workflow_dispatch` runs are **advisory** for release gating, and only
-  `push`/`pull_request` runs gate a release. `do_ci_check` classifies runs through
-  `scripts/lib/release-gate-events.sh` (an allowlist, so a newly-introduced event type does
-  not silently become gating), queries gating and advisory runs **separately** so advisory
-  noise cannot consume the `--limit` window and hide the real `CI` run, and
-  `scripts/test-release-workflow.sh` drives the real `do_ci_check` against a stubbed `gh`.
-  A tag-triggered nightly is a `push` event and therefore **still gates** a release.
-  The event names are written down **once**, in the library's arrays: an earlier version
-  kept the classification in the library but still selected runs in `release-manager.sh`
-  with its own `select(.event == "push" or …)`, and dropping `pull_request` from that
-  inline copy left every fixture **green** — the fixture exercised the library while the
-  gate implemented something else, and no test could see the disagreement. The gate now
-  calls `release_gate_select_runs`, and the fixture fails if the gate inlines the names.
+  `push`/`pull_request` runs gate a release. `do_ci_check` classifies events
+  through `scripts/lib/release-gate-events.sh`, an allowlist, and the
+  `query_release_gate_runs` helper queries each gating and advisory event
+  separately with `--event` before the 100-run limit. The query and selector
+  both use the library arrays. `scripts/test-release-workflow.sh` drives the
+  real `do_ci_check` with a stub that honors filtering and limits; it covers
+  red `pull_request` runs and a failed push behind 99 unrelated issue runs.
+  The unfiltered list is visibility only and never determines the gate verdict.
+  A tag-triggered nightly is a `push` event and therefore **still gates** a
+  release. The previous source-text checks did not prove behavior under a
+  capped run list; the regression now reproduces and catches that false-green.
 - References: `scripts/release-manager.sh`, `scripts/lib/release-gate-events.sh`,
   `.github/workflows/nightly-tests.yml`, ADR-027, ADR-083.
 

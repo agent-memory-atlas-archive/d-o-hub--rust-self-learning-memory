@@ -55,27 +55,28 @@ gate and its test share one implementation. A test that re-implements the filter
 fail when the gate is broken.
 
 The library holds the event names **once**, in `RELEASE_GATE_GATING_EVENTS` and
-`RELEASE_GATE_ADVISORY_EVENTS`, and exposes `release_gate_select_runs` /
-`release_gate_other_runs` to select by class. The gate calls those helpers; it does **not**
-write the event names into a jq expression of its own. A second copy of the event list is a
-second source of truth, and nothing in the test suite can catch the two disagreeing — the
-fixture would happily pass while the gate implemented a different rule. (This was not
-hypothetical: with the filter inlined in `release-manager.sh`, dropping `pull_request` from
-the gate's jq left the fixture green. The library now owns the names, the fixture asserts
-the gate uses the shared selector, and both mutations fail the fixture.)
+`RELEASE_GATE_ADVISORY_EVENTS`. `query_release_gate_runs` walks the selected class
+array and calls `gh run list` once per event with one `--event` value; the gate
+then applies `release_gate_select_runs` to the combined result. The query and
+classification therefore use the same event lists.
 
-`do_ci_check()` and `do_status()` in `scripts/release-manager.sh` request the `event` field
-(`--json status,conclusion,name,event`) and query gating and advisory runs **separately**,
-server-side:
+The fixture drives the real `do_ci_check` with a stubbed `gh` that applies the
+event filter before the result limit. It checks verdicts for red/pending gating
+runs and red advisory/non-CI runs, rather than asserting source text.
 
-- gating: `gh run list --branch main --commit <head> --limit 100 --json …`, then
-  `release_gate_select_runs "$runs_json" gating`
-- advisory: the same query with `--event schedule --event workflow_dispatch`, then
-  `release_gate_select_runs "$advisory_runs_json" advisory`
+`do_ci_check()` and `do_status()` query each gating and advisory event separately:
 
-Querying separately is deliberate. A single query followed by a client-side filter would let
-advisory noise consume the `--limit` window and silently drop the real `CI` run — a fail-open
-gate that reports green without ever seeing the run that matters.
+- gating: separate `--event push` and `--event pull_request` calls, each with
+  `--branch main --commit <head> --limit 100`
+- advisory: separate `--event schedule` and `--event workflow_dispatch` calls
+  with the same branch, commit, and limit
+
+`do_ci_check` makes an additional unfiltered 100-run query only to report other
+event types. It never uses that truncated list to decide the release verdict.
+Separate per-event queries keep unrelated events from consuming a gating event's
+limit. The regression fixture places 99 unrelated issue runs between a green
+push and a failed push; the failed run must still block. A single unfiltered
+query followed by a client-side filter would omit that failure.
 
 Gating assertions (`total > 0`, `pending == 0`, `failed == 0`) operate strictly on the gating set.
 Advisory runs are logged separately with an explicit label (`schedule/workflow_dispatch —
@@ -109,13 +110,17 @@ block, and a red or pending `push` run must block.
 1. **Require Nightly to Gate Releases**: Rejecting releases whenever `schedule` runs fail. Rejected: Scheduled nightlies re-attach to the same SHA daily and include force-run ignored tests; an un-cleared nightly debt would lock the release pipeline indefinitely despite green push CI.
 2. **Silently Omit Advisory Runs**: Hiding `schedule` runs entirely from `ci-check`. Rejected: Maintainers need visibility into all runs on HEAD; logging advisory runs separately provides transparency without blocking ship.
 3. **Denylist Filtering (the first implementation of this ADR)**: gate = "not `schedule` and not `workflow_dispatch`". Rejected: it makes every *other* event type gating by default, including `issues` and `dynamic` (CodeQL) runs, which are not evidence about the release commit. The allowlist in §1 is what the code now implements.
-4. **Single Query + Client-Side Filter**: one `gh run list` call, filtered by `jq` afterwards. Rejected: the `--limit` window is consumed by whatever runs sort first, so advisory noise can push the real `CI` run out of the result set — the gate would pass without having seen it.
-5. **Event names inlined in the gate's jq expression**: the classification in a library, but `release-manager.sh` selecting runs with its own `select(.event == "push" or …)`. Rejected: the event names then exist twice, and the fixture exercises the library while the gate implements something else — a disagreement no test in the suite can see. Measured: dropping `pull_request` from the gate's inline filter left every fixture green. The gate now calls `release_gate_select_runs`, and the fixture asserts it.
+4. **One Unfiltered Query + Client-Side Filter**: rejected; unrelated runs can consume the
+   result limit before the local selector sees a failing gating run. The capped-list regression
+   fixture reproduces that false-green result.
+5. **Duplicated Event Lists**: rejected; query and classification could drift. The query helper
+   and selector both use the library arrays, and the behavioral fixture tests the actual verdict
+   instead of checking implementation text.
 
 ## Acceptance Criteria
 
 - `plans/adr/ADR-083-Release-Gate-CI-Check-Event-Filtering.md` records this decision.
 - `do_ci_check` in `scripts/release-manager.sh` filters by `.event` so `schedule` and `workflow_dispatch` runs do not block releases, and `push`/`pull_request` runs still do.
 - The classification lives in `scripts/lib/release-gate-events.sh` and is exercised by `scripts/test-release-workflow.sh` through the real `do_ci_check` (not a re-implementation).
-- The event names are written down **once**, in the library's arrays; the gate selects runs through `release_gate_select_runs` and the fixture fails if the gate inlines them.
+- The event names live once in the library arrays; the per-event query helper and selector use those arrays. Fixtures drive real `do_ci_check` behavior, including omitted-event and result-limit cases.
 - `AGENTS.md` and the `release-guard` skill document the event filtering rule, and `agent_docs/LESSONS.md` LESSON-051 plus `.agents/skills/ci-fix/SKILL.md` no longer assert the superseded rule.
