@@ -21,10 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both `deny.toml` and `.cargo/audit.toml` — the two tools read different
   advisory databases, so a waiver in only one leaves the other gate red.
 
-  The `fuzz` dependency graph is still excluded from every gate
-  (`Cargo.toml:14` `exclude = ["fuzz"]`) and still fails
-  `cargo deny --manifest-path fuzz/Cargo.toml check advisories`; auditing it
-  separately is #1208.
+  The excluded `fuzz` dependency graph now receives its own blocking `cargo deny`
+  and `cargo audit` checks through `scripts/check-dependency-audit.sh`. The
+  regression fixture verifies missing and empty lockfiles and asserts the seeded
+  `RUSTSEC-2021-0145` finding comes from `fuzz/Cargo.lock` (#1208).
 
 ### CI/CD
 
